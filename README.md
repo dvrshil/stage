@@ -57,8 +57,17 @@ assets placed by their center and turned by `facing` (0 faces north).
 }
 ```
 
+Several floors: each level has an `elevation`, a `height`, and a floor
+`slab`; rooms stack on their own, a tall room beside a short one gets the
+right walls, and `well: true` leaves the hole a stair comes up through.
+Stairs are items (`stairs/horseshoe`, `stairs/straight`) that a person
+climbs when walking. `open: true` makes a terrace, a roof, or a garden,
+with a parapet where nothing else stands. A level can carry a `plan`
+image, the architect's drawing, shown under the plan view so the walls can
+be checked against it; render `plan:<level>` to see one floor at a time.
+
 `bin/stage schema` prints the whole format as JSON Schema, and
-`examples/` has two complete scenes.
+`examples/` has three complete scenes, including a two-storey house.
 
 ## Commands
 
@@ -69,7 +78,7 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 | --- | --- |
 | `stage new <path> [--from flat]` | Start a scene, empty or from an example |
 | `stage check <scene>` | Schema, references, and spatial rules |
-| `stage render <scene> -o out.png [--camera id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses |
+| `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor |
 | `stage query <scene> rooms` | Also `room <id>`, `items in <room>`, `walls <room>`, `bounds` |
 | `stage set <scene> items '<json>'` | Add an entity, or replace the one with its id |
 | `stage remove <scene> <id>` | Remove an entity |

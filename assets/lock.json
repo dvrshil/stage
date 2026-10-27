@@ -276,6 +276,213 @@
           "md5": "30cb990f0569e90c5e7e7ef81f0e3b6f"
         }
       }
+    },
+    "white_stucco": {
+      "source": "https://polyhaven.com/a/white_stucco",
+      "license": "CC0",
+      "size": [
+        1.998,
+        1.998
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/white_stucco/1k/color.jpg",
+          "md5": "34b66656dbf2a90eec29306deb1a20d0"
+        },
+        "normal": {
+          "file": "polyhaven/white_stucco/1k/normal.jpg",
+          "md5": "3e70f3be77f582fd41a9a08c8e8a6e66"
+        },
+        "arm": {
+          "file": "polyhaven/white_stucco/1k/arm.jpg",
+          "md5": "8528cc4a2fe3c4c047161682ecacdf7f"
+        }
+      }
+    },
+    "concrete_wall_007": {
+      "source": "https://polyhaven.com/a/concrete_wall_007",
+      "license": "CC0",
+      "size": [
+        2.16,
+        2.16
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/concrete_wall_007/1k/color.jpg",
+          "md5": "f8a951200ebe1a42ba57ef331d94f8e2"
+        },
+        "normal": {
+          "file": "polyhaven/concrete_wall_007/1k/normal.jpg",
+          "md5": "7d62088fb4f40833226cdb2a09476a58"
+        },
+        "arm": {
+          "file": "polyhaven/concrete_wall_007/1k/arm.jpg",
+          "md5": "ca6aa7493f967746b2e74461d4bf14c3"
+        }
+      }
+    },
+    "leafy_grass": {
+      "source": "https://polyhaven.com/a/leafy_grass",
+      "license": "CC0",
+      "size": [
+        2,
+        2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/leafy_grass/1k/color.jpg",
+          "md5": "0dbc071e91d6905edfcfbe8eb785a1ab"
+        },
+        "normal": {
+          "file": "polyhaven/leafy_grass/1k/normal.jpg",
+          "md5": "8279e096e204ea326d57a318869f99df"
+        },
+        "arm": {
+          "file": "polyhaven/leafy_grass/1k/arm.jpg",
+          "md5": "44fb4e40ef0f3425a7d1a14bc328e4d8"
+        }
+      }
+    },
+    "interlocking_concrete_pavers": {
+      "source": "https://polyhaven.com/a/interlocking_concrete_pavers",
+      "license": "CC0",
+      "size": [
+        1.8,
+        1.8
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/interlocking_concrete_pavers/1k/color.jpg",
+          "md5": "5b87a284763747870b74cc589080d227"
+        },
+        "normal": {
+          "file": "polyhaven/interlocking_concrete_pavers/1k/normal.jpg",
+          "md5": "b8f2196f4c1919068dfd9cab9e651ba5"
+        },
+        "arm": {
+          "file": "polyhaven/interlocking_concrete_pavers/1k/arm.jpg",
+          "md5": "f3ada71bef6cd4e65600d0ed9b5c0ab1"
+        }
+      }
+    },
+    "precast_stone_paving": {
+      "source": "https://polyhaven.com/a/precast_stone_paving",
+      "license": "CC0",
+      "size": [
+        2.24,
+        2.24
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/precast_stone_paving/1k/color.jpg",
+          "md5": "8ebba4cc556d5e4f4f1a064377a52326"
+        },
+        "normal": {
+          "file": "polyhaven/precast_stone_paving/1k/normal.jpg",
+          "md5": "c85a36795ee5c5c6ba641722520457fd"
+        },
+        "arm": {
+          "file": "polyhaven/precast_stone_paving/1k/arm.jpg",
+          "md5": "3ea9dc5d062d43733057d27cb7d81b98"
+        }
+      }
+    },
+    "gravel_floor_02": {
+      "source": "https://polyhaven.com/a/gravel_floor_02",
+      "license": "CC0",
+      "size": [
+        2,
+        2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/gravel_floor_02/1k/color.jpg",
+          "md5": "9e420814367b8ee7a25bcfea10ff4b08"
+        },
+        "normal": {
+          "file": "polyhaven/gravel_floor_02/1k/normal.jpg",
+          "md5": "ed3da750848a3e05faff98bc5b08c491"
+        },
+        "arm": {
+          "file": "polyhaven/gravel_floor_02/1k/arm.jpg",
+          "md5": "985dce4fb099a723dc083286d2ed757a"
+        }
+      }
+    },
+    "asphalt_02": {
+      "source": "https://polyhaven.com/a/asphalt_02",
+      "license": "CC0",
+      "size": [
+        3,
+        3
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/asphalt_02/1k/color.jpg",
+          "md5": "fa19772d4817754c3efab708c651f5a8"
+        },
+        "normal": {
+          "file": "polyhaven/asphalt_02/1k/normal.jpg",
+          "md5": "338da8de636ea36133170578cac82e8e"
+        },
+        "arm": {
+          "file": "polyhaven/asphalt_02/1k/arm.jpg",
+          "md5": "33820445f43af5e5ee484674b6939271"
+        }
+      }
+    },
+    "wood_floor_deck": {
+      "source": "https://polyhaven.com/a/wood_floor_deck",
+      "license": "CC0",
+      "size": [
+        1.8,
+        1.8
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/wood_floor_deck/1k/color.jpg",
+          "md5": "186a695239216a4b9dc970a87d6dbb15"
+        },
+        "normal": {
+          "file": "polyhaven/wood_floor_deck/1k/normal.jpg",
+          "md5": "dddabd549ede92e370d5268b0d895179"
+        },
+        "arm": {
+          "file": "polyhaven/wood_floor_deck/1k/arm.jpg",
+          "md5": "03ad8cabd71e499b06781ccb17c14d41"
+        }
+      }
+    },
+    "ceramic_roof_01": {
+      "source": "https://polyhaven.com/a/ceramic_roof_01",
+      "license": "CC0",
+      "size": [
+        3.5,
+        3.5
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/ceramic_roof_01/1k/color.jpg",
+          "md5": "5c8b9deb160ae011b496f7d0b8470cbb"
+        },
+        "normal": {
+          "file": "polyhaven/ceramic_roof_01/1k/normal.jpg",
+          "md5": "c4648f1aedde8db601990f46d8bcde4d"
+        },
+        "arm": {
+          "file": "polyhaven/ceramic_roof_01/1k/arm.jpg",
+          "md5": "9f1983d0b9a6f3ededb4792090db7f83"
+        }
+      }
     }
   },
   "skies": {
@@ -728,6 +935,434 @@
         0.43,
         0.43,
         0.95
+      ]
+    },
+    "shrub_03": {
+      "source": "https://polyhaven.com/a/shrub_03",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/shrub_03/1k/shrub_03.gltf",
+        "md5": "2c1ef10ff17e23f81d29c851d1409c9a"
+      },
+      "files": [
+        {
+          "file": "polyhaven/shrub_03/1k/shrub_03.bin",
+          "md5": "c26c6ed23b0034664eab5a0e3ee00f6a"
+        },
+        {
+          "file": "polyhaven/shrub_03/1k/textures/shrub_03_arm_1k.jpg",
+          "md5": "67faf4c5c213589b41a3bd18d378fa7d"
+        },
+        {
+          "file": "polyhaven/shrub_03/1k/textures/shrub_03_diff_1k.jpg",
+          "md5": "5da9190b7c2837a9e209a3fe774dba3c"
+        },
+        {
+          "file": "polyhaven/shrub_03/1k/textures/shrub_03_nor_gl_1k.jpg",
+          "md5": "38956b2171644cfefda2ef542e055100"
+        }
+      ],
+      "size": [
+        1.37,
+        0.15,
+        0.4
+      ]
+    },
+    "tree_small_02": {
+      "source": "https://polyhaven.com/a/tree_small_02",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/tree_small_02/1k/tree_small_02.gltf",
+        "md5": "63f42b19687332f7b3a5c8b531734d8e"
+      },
+      "files": [
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_branch_nor_gl_1k.jpg",
+          "md5": "00a3eed0d4d28e7e890d9ec6ac0619af"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_branch_diff_1k.jpg",
+          "md5": "88b531469f5dba2fc44ca85df3776e7c"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_branch_arm_1k.jpg",
+          "md5": "9ec3d8428295d87ae363bf0d1e0a8288"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_leaves_nor_gl_1k.jpg",
+          "md5": "b06c87e73f54d9654f66d67e9de7aa85"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_leaves_diff_1k.jpg",
+          "md5": "315cbc2cebfb399e649ccd39112c109a"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_leaves_arm_1k.jpg",
+          "md5": "3dad5bafc732f7692db32a262530bbab"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_nor_gl_1k.jpg",
+          "md5": "115a20da8621cd3e034e9b1bbe574746"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_diff_1k.jpg",
+          "md5": "a7287a3f4e7f0d4577cb949b245f5b14"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/textures/tree_small_02_arm_1k.jpg",
+          "md5": "44b6ed4bf32d7cd67cb3e9d5faeacc38"
+        },
+        {
+          "file": "polyhaven/tree_small_02/1k/tree_small_02.bin",
+          "md5": "7a7019a87e6fe0d7475c0fa2e08d8962"
+        }
+      ],
+      "size": [
+        2.92,
+        4.29,
+        4.56
+      ]
+    },
+    "jacaranda_tree": {
+      "source": "https://polyhaven.com/a/jacaranda_tree",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/jacaranda_tree/1k/jacaranda_tree.gltf",
+        "md5": "8fed93ff7cbdaac0f5c199ef1fd0f694"
+      },
+      "files": [
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_branches_nor_gl_1k.jpg",
+          "md5": "789084affb01f4a22290a848558f5e12"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_branches_diff_1k.jpg",
+          "md5": "e5bacbfd3e7ce397bdd34b0bac6669ca"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_branches_arm_1k.jpg",
+          "md5": "5b6f5b3838f4a8f60fea14fa3a3fef9f"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_trunk_nor_gl_1k.jpg",
+          "md5": "af34d3a054b498f153e4793f7520a630"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_trunk_diff_1k.jpg",
+          "md5": "c3edc2e76157023e7a5c35cd13867498"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_trunk_arm_1k.jpg",
+          "md5": "7232b4514e9412725a6a8e65a69f4ed4"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_leaves_nor_gl_1k.jpg",
+          "md5": "7cbd82c0dd4b8c8a4ab314338f50404d"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_leaves_diff_1k.jpg",
+          "md5": "8ae91737f39567629768a255817d80be"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/textures/jacaranda_tree_leaves_arm_1k.jpg",
+          "md5": "fabee050680fd173032acf003ef61191"
+        },
+        {
+          "file": "polyhaven/jacaranda_tree/1k/jacaranda_tree.bin",
+          "md5": "ae25eacd5e67ea2e9bbbaa2854b6ed99"
+        }
+      ],
+      "size": [
+        24.42,
+        19.15,
+        19.47
+      ]
+    },
+    "modern_wooden_cabinet": {
+      "source": "https://polyhaven.com/a/modern_wooden_cabinet",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/modern_wooden_cabinet/1k/modern_wooden_cabinet.gltf",
+        "md5": "623406579e948eb75ff52ec1498085c8"
+      },
+      "files": [
+        {
+          "file": "polyhaven/modern_wooden_cabinet/1k/modern_wooden_cabinet.bin",
+          "md5": "0a619e6311e6b04b92e9f226f3d0978d"
+        },
+        {
+          "file": "polyhaven/modern_wooden_cabinet/1k/textures/modern_wooden_cabinet_nor_gl_1k.jpg",
+          "md5": "62477103e44ac1b2746c9bb201f89e06"
+        },
+        {
+          "file": "polyhaven/modern_wooden_cabinet/1k/textures/modern_wooden_cabinet_arm_1k.jpg",
+          "md5": "bb821c89979d89ce2421df13af67fb07"
+        },
+        {
+          "file": "polyhaven/modern_wooden_cabinet/1k/textures/modern_wooden_cabinet_diff_1k.jpg",
+          "md5": "9c7e897741dd9aea6382f04e710d739b"
+        }
+      ],
+      "size": [
+        2.44,
+        0.52,
+        0.68
+      ]
+    },
+    "outdoor_table_chair_set_01": {
+      "source": "https://polyhaven.com/a/outdoor_table_chair_set_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/outdoor_table_chair_set_01/1k/outdoor_table_chair_set_01.gltf",
+        "md5": "e5f81fc86b52135f5a5897a51b859b07"
+      },
+      "files": [
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_table_nor_gl_1k.jpg",
+          "md5": "d284647b39e4ecda93b3ea85f40dc2d7"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_chair_arm_1k.jpg",
+          "md5": "52352847c3ce824803a9d500eec5614d"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_table_arm_1k.jpg",
+          "md5": "cf5aa95ce8b83991eaf5048eacea0611"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_table_diff_1k.jpg",
+          "md5": "afd8871dffcad88170a27b5fce6e3c7d"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/outdoor_table_chair_set_01.bin",
+          "md5": "8596ca40855bc417ac5248a54bd85990"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_chair_nor_gl_1k.jpg",
+          "md5": "ac08f5c3335c94e1dca986383265c23a"
+        },
+        {
+          "file": "polyhaven/outdoor_table_chair_set_01/1k/textures/outdoor_table_chair_set_01_chair_diff_1k.jpg",
+          "md5": "cb6d4004ad957a6b89aabe4c8dddd6fd"
+        }
+      ],
+      "size": [
+        0.78,
+        1.83,
+        0.86
+      ]
+    },
+    "street_lamp_01": {
+      "source": "https://polyhaven.com/a/street_lamp_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/street_lamp_01/1k/street_lamp_01.gltf",
+        "md5": "d29d1fc30bbdad99a58371754f144e65"
+      },
+      "files": [
+        {
+          "file": "polyhaven/street_lamp_01/1k/textures/street_lamp_01_arm_1k.jpg",
+          "md5": "63d980174db10cf22a1b175743c465c9"
+        },
+        {
+          "file": "polyhaven/street_lamp_01/1k/textures/street_lamp_01_diff_1k.jpg",
+          "md5": "82efb7531a25cda3ef8af2aff8ecccf7"
+        },
+        {
+          "file": "polyhaven/street_lamp_01/1k/textures/street_lamp_01_nor_gl_1k.jpg",
+          "md5": "c27d8102c7e851a8f0f654bb959b9d67"
+        },
+        {
+          "file": "polyhaven/street_lamp_01/1k/street_lamp_01.bin",
+          "md5": "324bc6295e3962322514ddcfc7037b23"
+        }
+      ],
+      "size": [
+        0.7,
+        0.39,
+        3.87
+      ]
+    },
+    "covered_car": {
+      "source": "https://polyhaven.com/a/covered_car",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/covered_car/1k/covered_car.gltf",
+        "md5": "c38cd2ddf3fe2abe7ed8df2fd6020b84"
+      },
+      "files": [
+        {
+          "file": "polyhaven/covered_car/1k/covered_car.bin",
+          "md5": "38f16c2c092dff1191ac5383acaf2ca0"
+        },
+        {
+          "file": "polyhaven/covered_car/1k/textures/covered_car_nor_gl_1k.jpg",
+          "md5": "afc43e8dd74213483a454cdb00f0f541"
+        },
+        {
+          "file": "polyhaven/covered_car/1k/textures/covered_car_arm_1k.jpg",
+          "md5": "62f9a8c8719ce46ee5464462ec6ed6fc"
+        },
+        {
+          "file": "polyhaven/covered_car/1k/textures/covered_car_diff_1k.jpg",
+          "md5": "61c107225ca1cbd523d6d6e9c1775f22"
+        }
+      ],
+      "size": [
+        1.79,
+        4.38,
+        1.41
+      ]
+    },
+    "modular_street_seating": {
+      "source": "https://polyhaven.com/a/modular_street_seating",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/modular_street_seating/1k/modular_street_seating.gltf",
+        "md5": "350ccab60ac6ed46009c6bd578cf212f"
+      },
+      "files": [
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_supports_diff_1k.jpg",
+          "md5": "f8f3ce0a8510267bb320523b147e8bc5"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_armrests_nor_gl_1k.jpg",
+          "md5": "3161b56f328b98f1cc3a3748bdcdd57a"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_timber_arm_1k.jpg",
+          "md5": "ed6858f805affc2d5387043c7de0b9f3"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_supports_nor_gl_1k.jpg",
+          "md5": "eb422efce89e6d40608ce8e9a8c7d42a"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_timber_diff_1k.jpg",
+          "md5": "ef96054b965201bcf45a5fe1a137d853"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_connectors_nor_gl_1k.jpg",
+          "md5": "4489712b8404eb94a0ef2a8536f8571f"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_armrests_diff_1k.jpg",
+          "md5": "a1fa7086f8fadb9fc2861962505ee05d"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_supports_arm_1k.jpg",
+          "md5": "2464500fdfcde0319bffc0a8d46647cf"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_connectors_diff_1k.jpg",
+          "md5": "f6718698d2c27333dd568db4a42798ff"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_armrests_arm_1k.jpg",
+          "md5": "df3dbc4ed5ef4fb98970e331a18805b5"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_timber_nor_gl_1k.jpg",
+          "md5": "0d0b133fb0a1b66dad5501f2a861e19d"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/textures/modular_street_seating_connectors_arm_1k.jpg",
+          "md5": "0d5bb2990258ddcb5f12e758b242c1da"
+        },
+        {
+          "file": "polyhaven/modular_street_seating/1k/modular_street_seating.bin",
+          "md5": "5c0426b5068d5d41f0a301035ecac9ab"
+        }
+      ],
+      "size": [
+        4.34,
+        0.77,
+        0.95
+      ]
+    },
+    "potted_plant_01": {
+      "source": "https://polyhaven.com/a/potted_plant_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/potted_plant_01/1k/potted_plant_01.gltf",
+        "md5": "199e9e3d68f5447142db4066d60ae3f0"
+      },
+      "files": [
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_pot_rough_1k.jpg",
+          "md5": "8f2e400f94843a9239229bfe99d16688"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_leaves_nor_gl_1k.jpg",
+          "md5": "0a7ea996bb2a4e9e19a5299a5b654406"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_pot_diff_1k.jpg",
+          "md5": "67114dcd68232a6da88c627e144e65c4"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/potted_plant_01.bin",
+          "md5": "18377bd8d99b20a8d5fc5cf03cbf94b2"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_leaves_rough_1k.jpg",
+          "md5": "6251bfd59ced0360c16d9c286adbb131"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_pot_nor_gl_1k.jpg",
+          "md5": "7388c8cba421175fd70969df077988a1"
+        },
+        {
+          "file": "polyhaven/potted_plant_01/1k/textures/potted_plant_01_leaves_diff_1k.jpg",
+          "md5": "8cbaaa24c18c61be4201c473773dbffc"
+        }
+      ],
+      "size": [
+        0.59,
+        0.63,
+        1.35
+      ]
+    },
+    "didelta_spinosa": {
+      "source": "https://polyhaven.com/a/didelta_spinosa",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/didelta_spinosa/1k/didelta_spinosa.gltf",
+        "md5": "f5c5e0ef8f19bd7ee5df091a8c7c03d8"
+      },
+      "files": [
+        {
+          "file": "polyhaven/didelta_spinosa/1k/textures/didelta_spinosa_nor_gl_1k.jpg",
+          "md5": "6e9a17ded135d8a7e7853e1991c65a2c"
+        },
+        {
+          "file": "polyhaven/didelta_spinosa/1k/textures/didelta_spinosa_diff_1k.jpg",
+          "md5": "98df2b1d28c207f010e7a36a73a0fa4a"
+        },
+        {
+          "file": "polyhaven/didelta_spinosa/1k/textures/didelta_spinosa_arm_1k.jpg",
+          "md5": "b10ed07ecffd4c07607e8fd79b6d8620"
+        },
+        {
+          "file": "polyhaven/didelta_spinosa/1k/didelta_spinosa.bin",
+          "md5": "e06245baf85b7fdb084a6454bb8097ff"
+        }
+      ],
+      "size": [
+        2.12,
+        4.56,
+        2.07
       ]
     }
   }

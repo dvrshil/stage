@@ -12,6 +12,9 @@ export interface Material {
   // Paint over a texture: the photographed color is multiplied by `color`,
   // so one plaster relief serves every paint.
   tint?: boolean
+  // A color multiplied over the photograph, keeping its detail: greener
+  // grass, warmer stone.
+  shade?: string
   // The pattern drawn in code when the texture set isn't downloaded:
   // planks 18 cm wide, or tiles of `tile` meters.
   pattern?: 'planks' | 'tiles' | 'speckle'
@@ -37,6 +40,17 @@ export const MATERIALS: Record<string, Material> = {
   'carpet-beige': { color: '#c9bba4', roughness: 1, pattern: 'speckle' },
   'marble-white': { color: '#efede8', roughness: 0.3, texture: 'marble_01', pattern: 'tiles', tile: 0.8 },
   'brick-red': { color: '#9a4a3a', roughness: 0.9 },
+  // Outdoors: the house's own skin, and what the ground is made of.
+  'stucco-white': { color: '#ece6da', roughness: 0.9, texture: 'white_stucco', tint: true },
+  'stucco-warm': { color: '#e3d3bb', roughness: 0.9, texture: 'white_stucco', tint: true },
+  'concrete-wall': { color: '#a9a7a2', roughness: 0.9, texture: 'concrete_wall_007', pattern: 'speckle' },
+  'grass': { color: '#6f8f4e', roughness: 1, texture: 'leafy_grass', shade: '#a9d884', pattern: 'speckle' },
+  'roof-tile': { color: '#8a4a34', roughness: 0.8, texture: 'ceramic_roof_01', pattern: 'tiles', tile: 0.3 },
+  'pavers': { color: '#9d968c', roughness: 0.9, texture: 'interlocking_concrete_pavers', pattern: 'tiles', tile: 0.2 },
+  'paving-stone': { color: '#b0a79a', roughness: 0.85, texture: 'precast_stone_paving', pattern: 'tiles', tile: 0.6 },
+  'gravel': { color: '#c9c2b4', roughness: 1, texture: 'gravel_floor_02', pattern: 'speckle' },
+  'asphalt': { color: '#3e3f41', roughness: 0.95, texture: 'asphalt_02', pattern: 'speckle' },
+  'deck': { color: '#a4784e', roughness: 0.7, texture: 'wood_floor_deck', pattern: 'planks' },
   // Furniture surfaces, which floors and walls can use too.
   'oak-veneer': { color: '#b8925f', roughness: 0.6, texture: 'oak_veneer_01', pattern: 'planks' },
   'walnut-veneer': { color: '#5d4330', roughness: 0.55, texture: 'mocha_oak_veneer', pattern: 'planks' },
@@ -48,6 +62,8 @@ export const DEFAULT_MATERIALS = {
   floor: 'oak-plank',
   walls: 'plaster-white',
   ceiling: 'plaster-white',
+  exterior: 'stucco-white',
+  ground: 'grass',
 }
 
 export function materialNames(): string[] {

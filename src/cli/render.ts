@@ -65,6 +65,8 @@ class Devtools {
 
 export interface RenderOptions {
   camera?: string
+  // Show this level and the ones below it.
+  level?: string
   // 'fast' skips ambient occlusion; 'high' is the default.
   quality?: 'high' | 'fast'
   width?: number
@@ -148,6 +150,7 @@ export class Renderer {
     await this.devtools.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId)
     const extra: Record<string, string> = { headless: '1', w: String(width), h: String(height) }
     if (options.camera) extra.camera = options.camera
+    if (options.level) extra.level = options.level
     if (options.quality) extra.quality = options.quality
     await this.devtools.send('Page.navigate', { url: viewerUrl(this.server.url, scene, extra) }, this.sessionId)
 

@@ -16,10 +16,26 @@ const id = z
 const point = z.tuple([z.number(), z.number()])
 const point3 = z.tuple([z.number(), z.number(), z.number()])
 
+// A drawing of the level, shown under the plan view so the walls can be
+// checked against it. `scale` is pixels per meter and `origin` the pixel
+// that sits at plan [0, 0]; image rows run down, plan y runs north.
+export const Plan = z.object({
+  image: z.string().describe('Image file, relative to the scene file'),
+  scale: z.number().positive(),
+  origin: point.default([0, 0]),
+  opacity: z.number().min(0).max(1).default(0.55),
+})
+
 export const Level = z.object({
   id,
+  name: z.string().optional(),
   elevation: z.number().default(0),
+  // Floor to ceiling. The next level's floor slab sits on top of that.
   height: z.number().positive().default(2.7),
+  // Thickness of this level's floor slab, below its elevation. Walls of
+  // the level below rise through it; the lowest level has none.
+  slab: z.number().min(0).default(0.15),
+  plan: Plan.optional(),
 })
 
 export const Room = z.object({
@@ -28,6 +44,15 @@ export const Room = z.object({
   name: z.string().optional(),
   floor: z.array(point).min(3, 'a floor needs at least three corners'),
   height: z.number().positive().optional(),
+  // Outdoors: no ceiling, and its own edges get a parapet instead of a
+  // wall. A terrace, a garden, a driveway.
+  open: z.boolean().default(false),
+  parapet: z.number().min(0).default(1),
+  // A well has no floor: the hole a stair comes up through, or a void over
+  // a tall room below.
+  well: z.boolean().default(false),
+  // No ceiling: a stairwell under a well, or a room open to the one above.
+  ceiling: z.boolean().default(true),
   materials: z
     .object({
       floor: z.string().optional(),
@@ -56,8 +81,11 @@ export const Item = z.object({
   room: id,
   at: point,
   facing: z.number().default(0),
+  // Above the room's floor.
   elevation: z.number().default(0),
-  // Width (x), depth (y), height (z) in meters; used when the asset is unknown.
+  // Width (x), depth (y), height (z) in meters. Builds a labeled box for an
+  // unknown asset, and sizes the library pieces that are made to measure
+  // (stairs, railings, counters, rugs).
   size: point3.optional(),
   scale: z.number().positive().default(1),
 })
@@ -80,6 +108,8 @@ export const Camera = z.object({
   // Vertical degrees. 55 is about a 24 mm lens on full frame: wide enough
   // for a room, without the stretching of anything wider.
   fov: z.number().min(10).max(150).default(55),
+  // For plan and orbit cameras: show this level and the ones below it.
+  level: id.optional(),
 })
 
 export const Scene = z.object({
@@ -96,6 +126,7 @@ export const Scene = z.object({
 
 export type Scene = z.infer<typeof Scene>
 export type Level = z.infer<typeof Level>
+export type Plan = z.infer<typeof Plan>
 export type Room = z.infer<typeof Room>
 export type Opening = z.infer<typeof Opening>
 export type Item = z.infer<typeof Item>
@@ -106,12 +137,13 @@ export type Camera = z.infer<typeof Camera>
 // way the schema does and a diff shows only real changes.
 export const KEY_ORDER: Record<string, string[]> = {
   scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'lights', 'cameras'],
-  level: ['id', 'elevation', 'height'],
-  room: ['id', 'level', 'name', 'floor', 'height', 'materials'],
+  level: ['id', 'name', 'elevation', 'height', 'slab', 'plan'],
+  plan: ['image', 'scale', 'origin', 'opacity'],
+  room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'materials'],
   opening: ['id', 'wall', 'at', 'type', 'width', 'height', 'sill', 'swing'],
   item: ['id', 'asset', 'room', 'at', 'facing', 'elevation', 'size', 'scale'],
   light: ['id', 'type', 'azimuth', 'elevation', 'intensity', 'color', 'at'],
-  camera: ['id', 'type', 'at', 'look', 'fov'],
+  camera: ['id', 'type', 'at', 'look', 'fov', 'level'],
 }
 
 export const COLLECTIONS = ['levels', 'rooms', 'openings', 'items', 'lights', 'cameras'] as const

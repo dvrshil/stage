@@ -1,5 +1,5 @@
 import { findAsset } from './assets.ts'
-import { DEFAULT_SILL, area, edges, pointInPolygon, roomHeight } from './geometry.ts'
+import { DEFAULT_SILL, area, edges, levelsByElevation, pointInPolygon, roomHeight } from './geometry.ts'
 import { MATERIALS } from './materials.ts'
 import { COLLECTIONS, Scene } from './schema.ts'
 
@@ -118,7 +118,16 @@ function references(scene: Scene): Problem[] {
         message: `room "${item.room}" does not exist; rooms are ${[...rooms.keys()].join(', ')}.`,
       })
     }
-    if (!findAsset(item.asset) && !item.asset.startsWith('./')) {
+    const info = findAsset(item.asset)
+    if (info && item.size && !info.resizable) {
+      problems.push({
+        severity: 'warning',
+        path: `items.${index}.size`,
+        entity: item.id,
+        message: `"${item.asset}" has a fixed size of ${info.size.join(' x ')} m, so "size" on "${item.id}" is ignored; use "scale" to resize it.`,
+      })
+    }
+    if (!info && !item.asset.startsWith('./')) {
       problems.push({
         severity: item.size ? 'warning' : 'error',
         path: `items.${index}.asset`,
@@ -131,6 +140,14 @@ function references(scene: Scene): Problem[] {
   })
 
   scene.cameras.forEach((camera, index) => {
+    if (camera.level && !levels.has(camera.level)) {
+      problems.push({
+        severity: 'error',
+        path: `cameras.${index}.level`,
+        entity: camera.id,
+        message: `level "${camera.level}" does not exist; levels are ${[...levels].join(', ')}.`,
+      })
+    }
     if (camera.type === 'perspective' && (!camera.at || !camera.look)) {
       problems.push({
         severity: 'error',
@@ -148,6 +165,21 @@ function spatial(scene: Scene): Problem[] {
   const problems: Problem[] = []
   const rooms = new Map(scene.rooms.map((r) => [r.id, r]))
 
+  const ordered = levelsByElevation(scene)
+  ordered.forEach((level, i) => {
+    const below = ordered[i - 1]
+    if (!below) return
+    const top = below.elevation + below.height + level.slab
+    if (level.elevation < top - 1e-6) {
+      problems.push({
+        severity: 'warning',
+        path: `levels.${scene.levels.indexOf(level)}.elevation`,
+        entity: level.id,
+        message: `"${level.id}" starts at ${level.elevation} m, inside "${below.id}" (floor ${below.elevation}, height ${below.height}, slab ${level.slab}); raise it to ${top.toFixed(3)} or lower the height of "${below.id}".`,
+      })
+    }
+  })
+
   scene.rooms.forEach((room, index) => {
     if (area(room.floor) < 0.5) {
       problems.push({
@@ -157,7 +189,7 @@ function spatial(scene: Scene): Problem[] {
         message: `the floor of "${room.id}" has an area of ${area(room.floor).toFixed(2)} m²; the corners probably repeat or lie on a line.`,
       })
     }
-    const hasWayIn = scene.openings.some((o) => o.wall.room === room.id) || sharesOpening(scene, room.id)
+    const hasWayIn = room.open || room.well || scene.openings.some((o) => o.wall.room === room.id) || sharesOpening(scene, room.id)
     if (!hasWayIn) {
       problems.push({
         severity: 'warning',
@@ -184,7 +216,7 @@ function spatial(scene: Scene): Problem[] {
       })
     }
     const bottom = opening.type === 'window' ? (opening.sill ?? DEFAULT_SILL) : 0
-    const height = roomHeight(scene, room)
+    const height = room.open ? room.parapet : roomHeight(scene, room)
     if (bottom + opening.height > height + 1e-6) {
       problems.push({
         severity: 'error',

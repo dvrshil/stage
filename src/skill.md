@@ -29,8 +29,37 @@ browser: it updates the moment you write, and outlines what you changed.
   90 = east, 180 = south). An unknown asset with a `size` [w, d, h] renders
   as a labeled box, so you can lay out first and resolve later.
 - `cameras`: `plan` and `orbit` always exist. Add perspective cameras with
-  `at` [x, y, z] and `look` [x, y, z]; z 1.6 is eye height.
+  `at` [x, y, z] and `look` [x, y, z]; z is absolute: a level's elevation
+  plus 1.6 is eye height there.
 - Ids are lowercase with hyphens and unique across the file.
+
+## Several floors
+
+- `levels`: each has `elevation` (its floor), `height` (floor to ceiling),
+  and `slab` (its floor slab, below the elevation). Put the next level at
+  elevation + height + slab. A room's `level` places it; a room on the
+  lowest level with closed rooms stands on the ground, plinth and all.
+- Rooms on different levels may share edges: walls stack on their own. A
+  tall room (`height` of two floors) beside a normal one gets the right wall
+  above its neighbor's ceiling.
+- `well: true` on a room draws no floor: the hole a stair comes up through,
+  on every level above the one it starts on. `ceiling: false` leaves the
+  room below it open. The stair itself is an item: `stairs/horseshoe` (up
+  the west side, across the north, down the east, around a well; its open
+  side faces south at facing 0) or `stairs/straight`. Give it a `size`
+  [width, depth, rise]; the rise is the floor-to-floor height.
+- `open: true` is outdoors: a terrace, a roof, a garden, a drive. No ceiling;
+  a `parapet` (default 1 m, 0 for none) on edges that touch nothing; no wall
+  at all where two open rooms meet. Outdoor floors: grass, pavers,
+  paving-stone, gravel, asphalt, deck, concrete.
+- A level may carry a `plan`: `{ "image": "plans/first.jpg", "scale":
+  <pixels per meter>, "origin": [px, py] }`, the drawing under the plan
+  view, with `origin` the pixel at plan [0, 0]. Render camera `plan:<level>`
+  to see that level's walls over its drawing; `render` and `show` also take
+  a `level`, which hides everything above it.
+- Items built to measure (stairs, railings, counters, wardrobes, rugs,
+  walls, columns, screens) take their own `size`; the rest have fixed sizes
+  and `scale`.
 
 ## How to work
 

@@ -1,0 +1,45 @@
+{
+  "stage": "0.1",
+  "name": "Two-storey test house",
+  "units": "m",
+  "levels": [
+    { "id": "ground", "name": "Ground floor", "elevation": 0.3, "height": 2.7, "slab": 0 },
+    { "id": "first", "name": "First floor", "elevation": 3.15, "height": 2.7, "slab": 0.15 },
+    { "id": "roof", "name": "Roof", "elevation": 6.0, "height": 1, "slab": 0.15 }
+  ],
+  "rooms": [
+    { "id": "hall", "level": "ground", "name": "Hall", "floor": [[0, 0], [6, 0], [6, 4], [0, 4]] },
+    { "id": "stair-g", "level": "ground", "name": "Stair", "floor": [[0, 4], [5, 4], [5, 5.6], [0, 5.6]], "ceiling": false, "materials": { "floor": "concrete" } },
+    { "id": "store", "level": "ground", "name": "Store", "floor": [[5, 4], [6, 4], [6, 5.6], [5, 5.6]] },
+    { "id": "lounge", "level": "first", "name": "Lounge", "floor": [[0, 0], [6, 0], [6, 4], [0, 4]], "materials": { "floor": "herringbone-oak" } },
+    { "id": "stair-1", "level": "first", "name": "Stair", "floor": [[0, 4], [5, 4], [5, 5.6], [0, 5.6]], "well": true, "ceiling": false },
+    { "id": "store-1", "level": "first", "name": "Store", "floor": [[5, 4], [6, 4], [6, 5.6], [5, 5.6]] },
+    { "id": "roof-terrace", "level": "roof", "name": "Roof terrace", "floor": [[0, 0], [6, 0], [6, 5.6], [5, 5.6], [5, 4], [0, 4]], "open": true, "parapet": 1, "materials": { "floor": "concrete" } },
+    { "id": "stair-top", "level": "roof", "name": "Stair top", "floor": [[0, 4], [5, 4], [5, 5.6], [0, 5.6]], "well": true, "height": 2.4 },
+    { "id": "porch", "level": "ground", "name": "Porch", "floor": [[6, 0], [9, 0], [9, 4], [6, 4]], "open": true, "parapet": 0, "materials": { "floor": "pavers" } },
+    { "id": "garden", "level": "ground", "name": "Garden", "floor": [[-4, -4], [13, -4], [13, 9], [-4, 9]], "open": true, "parapet": 0.5, "materials": { "floor": "grass" } }
+  ],
+  "openings": [
+    { "id": "front-door", "wall": { "room": "hall", "edge": 1 }, "at": 1.5, "type": "door", "width": 0.9, "height": 2.1 },
+    { "id": "hall-window", "wall": { "room": "hall", "edge": 0 }, "at": 1, "type": "window", "width": 1.8, "height": 1.4 },
+    { "id": "stair-open-g", "wall": { "room": "stair-g", "edge": 0 }, "at": 0, "type": "opening", "width": 5, "height": 2.7 },
+    { "id": "stair-open-1", "wall": { "room": "stair-1", "edge": 0 }, "at": 0, "type": "opening", "width": 5, "height": 2.7 },
+    { "id": "stair-open-top", "wall": { "room": "stair-top", "edge": 0 }, "at": 2, "type": "door", "width": 0.9, "height": 2.1 },
+    { "id": "lounge-window", "wall": { "room": "lounge", "edge": 0 }, "at": 1, "type": "window", "width": 3, "height": 1.5 },
+    { "id": "store-door", "wall": { "room": "store", "edge": 0 }, "at": 0.05, "type": "door", "width": 0.8, "height": 2.1 }
+  ],
+  "items": [
+    { "id": "stair-ground", "asset": "stairs/horseshoe", "room": "stair-g", "at": [2.5, 4.8], "size": [5, 1.6, 2.85] },
+    { "id": "stair-first", "asset": "stairs/horseshoe", "room": "stair-1", "at": [2.5, 4.8], "size": [5, 1.6, 2.85] },
+    { "id": "sofa", "asset": "sofa/three-seat", "room": "lounge", "at": [3, 1], "facing": 0 },
+    { "id": "steps", "asset": "stairs/straight", "room": "porch", "at": [7, 1.5], "facing": 270, "size": [1.2, 0.6, 0.3] },
+    { "id": "person", "asset": "person/standing", "room": "hall", "at": [2, 2], "facing": 180 },
+    { "id": "car", "asset": "car/sedan", "room": "garden", "at": [10.5, 2], "facing": 0 }
+  ],
+  "lights": [{ "id": "sun", "type": "sun", "azimuth": 210, "elevation": 45, "intensity": 1 }],
+  "cameras": [
+    { "id": "hall-view", "at": [1, 0.8, 1.9], "look": [3, 4.5, 1.6] },
+    { "id": "lounge-view", "at": [1, 0.8, 4.75], "look": [3, 4.5, 4.4] },
+    { "id": "plan", "type": "plan" }
+  ]
+}

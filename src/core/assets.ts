@@ -16,6 +16,11 @@ export interface AssetInfo {
   model?: string
   // Turns the model so its front faces north at facing 0, in degrees.
   yaw?: number
+  // Built to measure: an item's own `size` sets it (stairs, railings,
+  // counters, rugs), where a model's size is fixed.
+  resizable?: boolean
+  // Walked over or under, never into.
+  passable?: boolean
 }
 
 export const ASSETS: AssetInfo[] = [
@@ -30,22 +35,56 @@ export const ASSETS: AssetInfo[] = [
   { id: 'bed/single', name: 'Single bed', category: 'bed', size: [0.9, 2.0, 0.95], tags: ['bed', 'single', 'bedroom', 'kids', 'sleep'] },
   { id: 'plant/fiddle-leaf', name: 'Fiddle-leaf fig', category: 'plant', size: [0.6, 0.6, 1.6], tags: ['plant', 'tree', 'green', 'decor', 'pot'] },
   { id: 'lamp/floor', name: 'Floor lamp', category: 'lamp', size: [0.4, 0.4, 1.6], tags: ['lamp', 'light', 'floor', 'living', 'reading'] },
-  { id: 'kitchen/counter-two-meter', name: 'Kitchen counter, 2 m', category: 'kitchen', size: [2.0, 0.6, 0.9], tags: ['kitchen', 'counter', 'cabinet', 'worktop', 'units'] },
+  { id: 'kitchen/counter-two-meter', name: 'Kitchen counter, 2 m', category: 'kitchen', size: [2.0, 0.6, 0.9], resizable: true, tags: ['kitchen', 'counter', 'cabinet', 'worktop', 'units'] },
   { id: 'kitchen/island-two-meter', name: 'Kitchen island, 2 m', category: 'kitchen', size: [2.0, 0.9, 0.9], tags: ['kitchen', 'island', 'counter', 'worktop'] },
   { id: 'kitchen/fridge', name: 'Fridge', category: 'kitchen', size: [0.7, 0.7, 1.8], tags: ['kitchen', 'fridge', 'refrigerator', 'appliance'] },
   { id: 'shelf/bookcase', model: 'steel_frame_shelves_01', name: 'Bookcase', category: 'shelf', size: [1.1, 0.5, 2.14], tags: ['shelf', 'bookcase', 'books', 'storage', 'living', 'office'] },
-  { id: 'rug/area', name: 'Area rug', category: 'rug', size: [2.4, 1.7, 0.02], tags: ['rug', 'carpet', 'living', 'floor', 'textile'] },
+  { id: 'rug/area', name: 'Area rug', category: 'rug', size: [2.4, 1.7, 0.02], resizable: true, tags: ['rug', 'carpet', 'living', 'floor', 'textile'] },
   { id: 'tv/stand', name: 'TV on a stand', category: 'tv', size: [1.6, 0.45, 1.2], tags: ['tv', 'television', 'media', 'living', 'stand', 'console'] },
-  { id: 'wardrobe/double', name: 'Double wardrobe', category: 'wardrobe', size: [1.2, 0.6, 2.1], tags: ['wardrobe', 'closet', 'storage', 'bedroom', 'clothes'] },
+  { id: 'wardrobe/double', name: 'Double wardrobe', category: 'wardrobe', size: [1.2, 0.6, 2.1], resizable: true, tags: ['wardrobe', 'closet', 'storage', 'bedroom', 'clothes'] },
   { id: 'bath/toilet', name: 'Toilet', category: 'bath', size: [0.4, 0.7, 0.8], tags: ['toilet', 'wc', 'bathroom'] },
   { id: 'bath/basin', name: 'Basin on a cabinet', category: 'bath', size: [0.6, 0.5, 0.85], tags: ['basin', 'sink', 'bathroom', 'vanity'] },
   { id: 'bath/tub', name: 'Bathtub', category: 'bath', size: [1.7, 0.75, 0.6], tags: ['bath', 'tub', 'bathtub', 'bathroom'] },
-  { id: 'kitchen/wall-cabinets', name: 'Wall cabinets, 2 m (hung 1.45 to 2.15 m)', category: 'kitchen', size: [2.0, 0.35, 2.15], tags: ['kitchen', 'cabinet', 'wall', 'upper', 'storage'] },
+  { id: 'kitchen/wall-cabinets', name: 'Wall cabinets, 2 m (hung 1.45 to 2.15 m)', category: 'kitchen', size: [2.0, 0.35, 2.15], resizable: true, tags: ['kitchen', 'cabinet', 'wall', 'upper', 'storage'] },
   { id: 'table/side', model: 'side_table_01', name: 'Side table', category: 'table', size: [0.55, 0.45, 0.55], tags: ['table', 'side', 'end', 'living', 'bedside', 'nightstand'] },
   { id: 'chair/lounge', model: 'mid_century_lounge_chair', name: 'Mid-century lounge chair', category: 'chair', size: [1.01, 1.19, 1.17], tags: ['chair', 'lounge', 'armchair', 'swivel', 'leather', 'living', 'reading'] },
   { id: 'plant/large-potted', model: 'potted_plant_02', name: 'Large potted plant', category: 'plant', size: [0.7, 0.66, 0.84], tags: ['plant', 'pot', 'green', 'decor', 'floor'] },
   { id: 'lamp/desk', model: 'desk_lamp_arm_01', name: 'Desk lamp', category: 'lamp', size: [0.2, 0.61, 0.89], tags: ['lamp', 'desk', 'light', 'office', 'study'] },
   { id: 'person/standing', name: 'Standing person, 1.75 m', category: 'person', size: [0.5, 0.3, 1.75], tags: ['person', 'human', 'people', 'figure', 'scale', 'adult'] },
+  // Structure, built to measure. Stairs climb to the next level unless
+  // their size gives a rise; their open side faces south at facing 0.
+  { id: 'stairs/horseshoe', name: 'Horseshoe stair around a well', category: 'stairs', size: [4.6, 1.5, 3.35], resizable: true, passable: true, tags: ['stairs', 'staircase', 'horseshoe', 'winder', 'u-turn', 'floor'] },
+  { id: 'stairs/straight', name: 'Straight flight of stairs', category: 'stairs', size: [1.0, 2.4, 1.0], resizable: true, passable: true, tags: ['stairs', 'steps', 'straight', 'flight', 'entrance', 'porch'] },
+  { id: 'railing/glass', name: 'Glass railing with a steel handrail', category: 'railing', size: [2.0, 0.06, 1.05], resizable: true, tags: ['railing', 'balustrade', 'glass', 'handrail', 'mezzanine', 'balcony', 'void'] },
+  { id: 'lift/doors', name: 'Lift doors, brushed steel', category: 'lift', size: [1.0, 0.12, 2.1], resizable: true, tags: ['lift', 'elevator', 'doors', 'steel'] },
+  { id: 'wall/boundary', name: 'Freestanding wall, to measure (compound, garden, parapet)', category: 'wall', size: [3.0, 0.23, 1.5], resizable: true, tags: ['wall', 'boundary', 'compound', 'fence', 'garden', 'freestanding', 'masonry'] },
+  { id: 'column/round', name: 'Round column', category: 'column', size: [0.3, 0.3, 3.0], resizable: true, tags: ['column', 'pillar', 'post', 'concrete', 'porch', 'structure'] },
+  { id: 'bath/shower', name: 'Shower cubicle, glass', category: 'bath', size: [0.9, 0.9, 2.1], resizable: true, tags: ['shower', 'bathroom', 'glass', 'cubicle'] },
+  { id: 'bath/jacuzzi', name: 'Jacuzzi, two seats', category: 'bath', size: [1.8, 1.8, 0.85], resizable: true, tags: ['jacuzzi', 'hot tub', 'spa', 'bath', 'whirlpool'] },
+  { id: 'bath/steam-cabin', name: 'Steam cabin, glass with a bench', category: 'bath', size: [1.2, 1.2, 2.1], resizable: true, tags: ['steam', 'sauna', 'cabin', 'bathroom', 'glass'] },
+  { id: 'wash/washing-machine', name: 'Washing machine', category: 'wash', size: [0.6, 0.6, 0.85], tags: ['washing', 'machine', 'laundry', 'wash', 'utility'] },
+  { id: 'kitchen/counter', name: 'Kitchen counter, to measure', category: 'kitchen', size: [1.8, 0.6, 0.9], resizable: true, tags: ['kitchen', 'counter', 'worktop', 'cabinet', 'units'] },
+  { id: 'wardrobe/sliding', name: 'Sliding-door wardrobe, to measure', category: 'wardrobe', size: [2.4, 0.6, 2.4], resizable: true, tags: ['wardrobe', 'closet', 'sliding', 'dress', 'storage', 'bedroom'] },
+  { id: 'bed/king', name: 'King bed', category: 'bed', size: [1.8, 2.1, 0.95], tags: ['bed', 'king', 'bedroom', 'sleep', 'master'] },
+  { id: 'table/round-small', name: 'Small round table', category: 'table', size: [0.7, 0.7, 0.74], tags: ['table', 'round', 'small', 'bedroom', 'corner', 'tea'] },
+  { id: 'seating/floor', name: 'Floor seating: a low platform with cushions, to measure', category: 'seating', size: [2.4, 0.9, 0.45], resizable: true, tags: ['seating', 'floor', 'indian', 'cushions', 'baithak', 'platform', 'low'] },
+  { id: 'theatre/recliner-row', name: 'Row of cinema recliners, to measure', category: 'theatre', size: [3.4, 1.1, 1.1], resizable: true, tags: ['theatre', 'cinema', 'recliner', 'seats', 'row', 'home theatre'] },
+  { id: 'screen/projection', name: 'Projection screen, to measure', category: 'screen', size: [3.6, 0.08, 2.05], resizable: true, passable: true, tags: ['screen', 'projector', 'projection', 'cinema', 'theatre', 'wall'] },
+  { id: 'tv/wall', name: 'Wall-mounted TV, 65 inch', category: 'tv', size: [1.45, 0.08, 0.84], passable: true, tags: ['tv', 'television', 'wall', 'mounted', 'bedroom', 'screen'] },
+  { id: 'hut/pavilion', name: 'Garden pavilion: posts and a hipped roof, to measure', category: 'hut', size: [3.66, 3.05, 3.0], resizable: true, passable: true, tags: ['hut', 'pavilion', 'gazebo', 'meditation', 'garden', 'roof', 'shelter'] },
+  { id: 'statue/buddha', name: 'Seated Buddha on a plinth', category: 'statue', size: [1.0, 1.0, 1.7], tags: ['statue', 'buddha', 'sculpture', 'garden', 'stone', 'meditation'] },
+  { id: 'rock/boulder', name: 'Boulder, to measure', category: 'rock', size: [0.9, 0.7, 0.5], resizable: true, tags: ['rock', 'boulder', 'stone', 'zen', 'garden', 'landscape'] },
+  { id: 'plant/shrub', model: 'didelta_spinosa', name: 'Shrub, to measure', category: 'plant', size: [0.8, 0.8, 0.8], resizable: true, tags: ['shrub', 'bush', 'plant', 'hedge', 'garden', 'green'] },
+  { id: 'tree/small', model: 'tree_small_02', name: 'Small tree, to measure', category: 'tree', size: [2.92, 4.29, 4.56], resizable: true, tags: ['tree', 'garden', 'plant', 'green', 'shade'] },
+  { id: 'tree/jacaranda', model: 'jacaranda_tree', name: 'Jacaranda tree, to measure', category: 'tree', size: [6.0, 6.0, 7.0], resizable: true, tags: ['tree', 'jacaranda', 'garden', 'flowering', 'shade', 'large'] },
+  { id: 'cabinet/sideboard', model: 'modern_wooden_cabinet', name: 'Modern wooden sideboard', category: 'cabinet', size: [2.0, 0.43, 0.56], tags: ['cabinet', 'sideboard', 'console', 'dining', 'living', 'storage', 'wood'] },
+  { id: 'table/outdoor-set', model: 'outdoor_table_chair_set_01', name: 'Outdoor table with two chairs', category: 'table', size: [0.78, 1.83, 0.86], tags: ['table', 'outdoor', 'terrace', 'garden', 'chairs', 'set', 'balcony'] },
+  { id: 'lamp/street', model: 'street_lamp_01', name: 'Street lamp', category: 'lamp', size: [0.7, 0.39, 3.87], tags: ['lamp', 'street', 'road', 'outdoor', 'light', 'post'] },
+  { id: 'car/covered', model: 'covered_car', name: 'Car under a cover', category: 'car', size: [1.79, 4.38, 1.41], tags: ['car', 'covered', 'garage', 'parking', 'vehicle'] },
+  { id: 'bench/street', model: 'modular_street_seating', name: 'Street bench, 4.3 m', category: 'bench', size: [4.34, 0.77, 0.95], tags: ['bench', 'street', 'outdoor', 'seat', 'contemporary', 'park'] },
+  { id: 'plant/potted-small', model: 'potted_plant_01', name: 'Potted plant, tall', category: 'plant', size: [0.59, 0.63, 1.35], tags: ['plant', 'pot', 'small', 'decor', 'shelf', 'table'] },
+  { id: 'car/sedan', name: 'Sedan car', category: 'car', size: [1.8, 4.6, 1.45], tags: ['car', 'sedan', 'vehicle', 'garage', 'parking', 'drive'] },
+  { id: 'bench/garden', name: 'Garden bench', category: 'bench', size: [1.5, 0.55, 0.85], tags: ['bench', 'garden', 'seat', 'outdoor', 'wood'] },
 ]
 
 // Models the engine places itself, rather than the scene file.

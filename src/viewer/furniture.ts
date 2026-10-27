@@ -4,6 +4,7 @@ import { MATERIALS } from '../core/materials.ts'
 import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { boxInMeters, contactShadow, cylinderInMeters, projectInMeters } from './textures.ts'
+import { stair as stairGeometry } from '../core/stairs.ts'
 
 // Furniture built from primitives, by asset id. Each builder returns a group
 // with its footprint centered on the origin, the floor at y = 0, and the
@@ -12,7 +13,12 @@ import { boxInMeters, contactShadow, cylinderInMeters, projectInMeters } from '.
 // then, and remain for pieces no CC0 model covers, in photographed
 // wood, linen, and wool where the library has them.
 
-type Builder = (size: [number, number, number]) => THREE.Group
+export interface BuildItemOptions {
+  // For stairs: how far they climb.
+  rise?: number
+}
+
+type Builder = (size: [number, number, number], options: BuildItemOptions) => THREE.Group
 
 const mat = (color: string, roughness = 0.8, metalness = 0) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness })
@@ -48,7 +54,7 @@ const FRONTS = mat('#efece5', 0.45)
 function surface(name: string, fallback: THREE.MeshStandardMaterial, tint = '#ffffff'): THREE.MeshStandardMaterial {
   const set = textureSet(MATERIALS[name]?.texture)
   if (!set) return fallback
-  return new THREE.MeshStandardMaterial({ color: tint, map: set.color, normalMap: set.normal, roughnessMap: set.arm, aoMap: set.arm, roughness: 1, metalness: 0 })
+  return new THREE.MeshStandardMaterial({ color: MATERIALS[name]?.shade ?? tint, map: set.color, normalMap: set.normal, roughnessMap: set.arm, aoMap: set.arm, roughness: 1, metalness: 0 })
 }
 
 // Called once the library has loaded, before the first build.
@@ -275,6 +281,307 @@ const BUILDERS: Record<string, Builder> = {
     box(g, mat('#dfe9ee', 0.1), w - 0.12, 0.01, d - 0.12, 0, h - 0.04)
     return g
   },
+
+  'bed/king': bed,
+  'kitchen/counter': counter,
+  'table/round-small': ([w, , h]) => {
+    const g = new THREE.Group()
+    cylinder(g, MATTE_BLACK, w * 0.3, w * 0.3, 0.02)
+    cylinder(g, MATTE_BLACK, 0.025, 0.025, h - 0.05, 0, 0.02)
+    cylinder(g, WOOD, w / 2, w / 2, 0.03, 0, h - 0.03)
+    return g
+  },
+  'wardrobe/sliding': ([w, d, h]) => {
+    const g = new THREE.Group()
+    box(g, MATTE_BLACK, w - 0.04, 0.06, d - 0.04)
+    box(g, WOOD, w, h - 0.06, d, 0, 0.06)
+    const doors = Math.max(2, Math.round(w / 0.9))
+    for (let i = 0; i < doors; i++) {
+      const dw = w / doors
+      const front = i % 2 === 0 ? -d / 2 - 0.012 : -d / 2 - 0.032
+      box(g, i % 2 === 0 ? WOOD : WHITE, dw - 0.01, h - 0.12, 0.02, -w / 2 + (i + 0.5) * dw, 0.08, front)
+    }
+    box(g, MATTE_BLACK, w, 0.04, 0.05, 0, h - 0.04, -d / 2 - 0.03)
+    return g
+  },
+  'wash/washing-machine': ([w, d, h]) => {
+    const g = new THREE.Group()
+    soft(g, WHITE, w, h, d, 0.02)
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.03, 32), OVEN_GLASS)
+    door.rotation.x = Math.PI / 2
+    door.position.set(0, h * 0.48, -d / 2 - 0.01)
+    g.add(door)
+    box(g, MATTE_BLACK, w - 0.06, 0.08, 0.01, 0, h - 0.12, -d / 2 - 0.005)
+    return g
+  },
+  'bath/shower': ([w, d, h]) => {
+    // A tiled tray, two glass sides, and a rain head on a chrome riser.
+    const g = new THREE.Group()
+    box(g, WHITE, w, 0.05, d)
+    const glass = new THREE.MeshPhysicalMaterial({ color: '#d9ecf3', roughness: 0.03, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+    box(g, glass, w, h - 0.05, 0.008, 0, 0.05, -d / 2 + 0.004).castShadow = false
+    box(g, glass, 0.008, h - 0.05, d, -w / 2 + 0.004, 0.05, 0).castShadow = false
+    box(g, STEEL, w, 0.03, 0.03, 0, h - 0.03, -d / 2 + 0.015)
+    cylinder(g, STEEL, 0.012, 0.012, h - 0.4, w / 2 - 0.08, 0.3, d / 2 - 0.08)
+    cylinder(g, STEEL, 0.12, 0.12, 0.02, w / 2 - 0.2, h - 0.12, d / 2 - 0.2)
+    return g
+  },
+  'bath/jacuzzi': ([w, d, h]) => {
+    const g = new THREE.Group()
+    soft(g, WHITE, w, h, d, 0.04)
+    const water = new THREE.MeshPhysicalMaterial({ color: '#7fc4d8', roughness: 0.08, transparent: true, opacity: 0.75 })
+    box(g, water, w - 0.3, 0.01, d - 0.3, 0, h - 0.08).castShadow = false
+    for (const z of [-d / 2 + 0.25, d / 2 - 0.25]) box(g, mat('#e8eef0', 0.4), w - 0.4, 0.04, 0.3, 0, h - 0.3, z)
+    return g
+  },
+  'bath/steam-cabin': ([w, d, h]) => {
+    const g = new THREE.Group()
+    box(g, mat('#d8d4cc', 0.6), w, 0.04, d)
+    const glass = new THREE.MeshPhysicalMaterial({ color: '#dceef4', roughness: 0.04, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+    box(g, glass, w, h - 0.04, 0.008, 0, 0.04, -d / 2 + 0.004).castShadow = false
+    box(g, glass, 0.008, h - 0.04, d, w / 2 - 0.004, 0.04, 0).castShadow = false
+    box(g, STEEL, 0.02, h - 0.04, 0.02, -w / 2 + 0.01, 0.04, -d / 2 + 0.01)
+    box(g, STEEL, 0.02, h - 0.04, 0.02, w / 2 - 0.01, 0.04, -d / 2 + 0.01)
+    box(g, WOOD, w - 0.1, 0.05, 0.4, 0, 0.42, d / 2 - 0.22)
+    box(g, WOOD, 0.05, 0.4, 0.4, -w / 2 + 0.1, 0.04, d / 2 - 0.22)
+    box(g, WOOD, 0.05, 0.4, 0.4, w / 2 - 0.1, 0.04, d / 2 - 0.22)
+    return g
+  },
+  'seating/floor': ([w, d, h]) => {
+    // A low platform with a long cushion and a row of bolsters: a baithak.
+    const g = new THREE.Group()
+    box(g, WOOD, w, 0.18, d)
+    soft(g, FABRIC_WARM, w - 0.04, 0.12, d - 0.04, 0.04, 0, 0.18)
+    const n = Math.max(2, Math.round(w / 0.6))
+    for (let i = 0; i < n; i++) soft(g, PILLOW, Math.min(0.5, w / n - 0.06), h - 0.3, 0.14, 0.05, -w / 2 + (i + 0.5) * (w / n), 0.3, d / 2 - 0.1)
+    return g
+  },
+  'theatre/recliner-row': ([w, d, h]) => {
+    const g = new THREE.Group()
+    const n = Math.max(1, Math.round(w / 0.85))
+    const sw = w / n
+    const leather = mat('#4a2c25', 0.55)
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + (i + 0.5) * sw
+      soft(g, MATTE_BLACK, sw - 0.06, 0.12, d - 0.1, 0.02, x, 0, 0)
+      soft(g, leather, sw - 0.1, 0.3, d * 0.72, 0.08, x, 0.12, -d * 0.1)
+      soft(g, leather, sw - 0.1, h - 0.15, 0.26, 0.09, x, 0.15, d / 2 - 0.15)
+      for (const s of [-1, 1]) soft(g, leather, 0.1, 0.5, d * 0.78, 0.04, x + s * (sw / 2 - 0.08), 0.12, -0.02)
+    }
+    return g
+  },
+  'screen/projection': ([w, , h]) => {
+    const g = new THREE.Group()
+    box(g, MATTE_BLACK, w, h, 0.03, 0, 0, 0.02)
+    box(g, new THREE.MeshStandardMaterial({ color: '#f2f2f0', roughness: 0.6, emissive: '#dfe3ea', emissiveIntensity: 0.25 }), w - 0.12, h - 0.12, 0.01, 0, 0.06, 0).castShadow = false
+    return g
+  },
+  'tv/wall': ([w, , h]) => {
+    const g = new THREE.Group()
+    box(g, MATTE_BLACK, w, h, 0.03, 0, 0, 0.03)
+    box(g, SCREEN, w - 0.012, h - 0.012, 0.002, 0, 0.006, 0.013).castShadow = false
+    return g
+  },
+  'railing/glass': ([w, , h]) => {
+    // Glass panels between slim steel posts, a round handrail on top.
+    const g = new THREE.Group()
+    const glass = new THREE.MeshPhysicalMaterial({ color: '#dbeaf0', roughness: 0.03, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+    box(g, glass, w - 0.02, h - 0.12, 0.012, 0, 0.02).castShadow = false
+    const posts = Math.max(2, Math.round(w / 1.2) + 1)
+    for (let i = 0; i < posts; i++) box(g, STEEL, 0.03, h - 0.04, 0.03, -w / 2 + 0.03 + (i * (w - 0.06)) / (posts - 1), 0)
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, w, 12), STEEL)
+    rail.rotation.z = Math.PI / 2
+    rail.position.y = h - 0.02
+    rail.castShadow = true
+    g.add(rail)
+    return g
+  },
+  'lift/doors': ([w, d, h]) => {
+    const g = new THREE.Group()
+    const brushed = mat('#b9bcc0', 0.35, 0.85)
+    box(g, brushed, w / 2 - 0.004, h, 0.04, -w / 4, 0, 0)
+    box(g, brushed, w / 2 - 0.004, h, 0.04, w / 4, 0, 0)
+    box(g, MATTE_BLACK, w + 0.16, 0.08, d, 0, h, 0)
+    box(g, MATTE_BLACK, 0.08, h, d, -w / 2 - 0.04, 0, 0)
+    box(g, MATTE_BLACK, 0.08, h, d, w / 2 + 0.04, 0, 0)
+    box(g, new THREE.MeshStandardMaterial({ color: '#fff4dc', emissive: '#ffd27a', emissiveIntensity: 1.5 }), 0.05, 0.05, 0.01, w / 2 + 0.2, 1.05, -d / 2)
+    return g
+  },
+  'column/round': ([w, , h]) => {
+    const g = new THREE.Group()
+    cylinder(g, mat('#d8d3c8', 0.85), w / 2, w / 2, h)
+    return g
+  },
+  'hut/pavilion': ([w, d, h]) => {
+    // Four posts on a deck under a hipped roof: a place to sit outside.
+    const g = new THREE.Group()
+    box(g, WOOD, w, 0.12, d)
+    const postH = h - 0.9
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, WOOD_DARK, 0.12, postH, 0.12, sx * (w / 2 - 0.15), 0.12, sz * (d / 2 - 0.15))
+    const roofBase = 0.12 + postH
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 1, 0.9, 4, 1), surface('roof-tile', mat('#6a4a34', 0.8)))
+    roof.rotation.y = Math.PI / 4
+    roof.scale.set((w + 0.4) / Math.SQRT2, 1, (d + 0.4) / Math.SQRT2)
+    roof.position.y = roofBase + 0.45
+    roof.castShadow = true
+    roof.receiveShadow = true
+    g.add(roof)
+    box(g, WOOD_DARK, w + 0.3, 0.08, d + 0.3, 0, roofBase - 0.08)
+    return g
+  },
+  'statue/buddha': ([w, , h]) => {
+    const g = new THREE.Group()
+    // A seated figure in stone: plinth, lotus base, folded legs, torso,
+    // shoulders, head and topknot. Read as a Buddha from across a garden.
+    const stone = mat('#8f8a80', 0.9)
+    box(g, stone, w, 0.45, w)
+    const blob = (r: number, sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), stone)
+      mesh.scale.set(sx, sy, sz)
+      mesh.position.set(x, y, z)
+      mesh.castShadow = true
+      g.add(mesh)
+    }
+    const k = h / 1.7
+    blob(w * 0.46, 1, 0.3, 1, 0, 0.5 * k, 0)
+    blob(w * 0.4, 1.1, 0.42, 0.75, 0, 0.62 * k, 0.02)
+    blob(w * 0.24, 1, 1.35, 0.72, 0, 0.98 * k, -0.02)
+    for (const s of [-1, 1]) blob(w * 0.1, 1, 1.9, 1, s * w * 0.27, 1.0 * k, 0)
+    blob(w * 0.17, 0.9, 1, 1, 0, 1.33 * k, 0)
+    blob(w * 0.13, 1, 1.1, 1, 0, 1.4 * k, 0)
+    blob(w * 0.05, 1, 1.3, 1, 0, 1.56 * k, 0)
+    return g
+  },
+  'rock/boulder': ([w, d, h]) => {
+    const g = new THREE.Group()
+    // Faceted, sunk a little into the ground, and never the same twist.
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5, 0), mat('#7d7a72', 0.95, 0).clone())
+    rock.scale.set(w, h * 1.25, d)
+    rock.position.y = h * 0.4
+    rock.rotation.set(0.35 + w, 0.6 + d * 2, 0.2 + h)
+    rock.castShadow = true
+    rock.receiveShadow = true
+    g.add(rock)
+    return g
+  },
+  'plant/shrub': ([w, d, h]) => {
+    const g = new THREE.Group()
+    const leaf = mat('#4a7a3c', 0.9)
+    for (const [x, z, r] of [[0, 0, 0.5], [0.25, 0.15, 0.36], [-0.22, 0.2, 0.34], [0.1, -0.25, 0.38], [-0.15, -0.18, 0.3]]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), leaf)
+      m.scale.set(r * w, r * h * 1.1, r * d)
+      m.position.set(x * w, h * 0.5, z * d)
+      m.castShadow = true
+      g.add(m)
+    }
+    return g
+  },
+  'tree/small': ([w, d, h]) => {
+    const g = new THREE.Group()
+    cylinder(g, WOOD_DARK, 0.07, 0.1, h * 0.45)
+    const leaf = mat('#3f6f36', 0.9)
+    for (const [x, y, z, r] of [[0, 0.72, 0, 0.5], [0.3, 0.6, 0.15, 0.34], [-0.28, 0.66, -0.1, 0.36], [0.05, 0.86, -0.2, 0.3], [-0.1, 0.55, 0.3, 0.3]]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), leaf)
+      m.scale.set(r * w, r * h * 0.6, r * d)
+      m.position.set(x * w, y * h, z * d)
+      m.castShadow = true
+      g.add(m)
+    }
+    return g
+  },
+  'car/sedan': ([w, d, h]) => {
+    const g = new THREE.Group()
+    const paint = new THREE.MeshPhysicalMaterial({ color: '#2b3540', roughness: 0.3, metalness: 0.6, clearcoat: 1, clearcoatRoughness: 0.08 })
+    soft(g, paint, w, h * 0.42, d, 0.08, 0, 0.22)
+    soft(g, paint, w * 0.88, h * 0.4, d * 0.5, 0.12, 0, 0.22 + h * 0.4, -d * 0.05)
+    const glass = new THREE.MeshPhysicalMaterial({ color: '#1a2630', roughness: 0.1, clearcoat: 1 })
+    soft(g, glass, w * 0.86, h * 0.3, d * 0.46, 0.08, 0, 0.22 + h * 0.46, -d * 0.05)
+    for (const sx of [-1, 1]) for (const z of [-d * 0.32, d * 0.32]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 20), MATTE_BLACK)
+      wheel.rotation.z = Math.PI / 2
+      wheel.position.set(sx * (w / 2 - 0.1), 0.33, z)
+      wheel.castShadow = true
+      g.add(wheel)
+    }
+    for (const sx of [-0.3, 0.3]) box(g, new THREE.MeshStandardMaterial({ color: '#fff8e0', emissive: '#fff2c0', emissiveIntensity: 0.8 }), 0.3, 0.1, 0.02, sx * w, 0.22 + h * 0.25, -d / 2)
+    return g
+  },
+  'bench/garden': ([w, d, h]) => {
+    const g = new THREE.Group()
+    for (const x of [-w / 2 + 0.08, w / 2 - 0.08]) {
+      box(g, MATTE_BLACK, 0.05, 0.42, d, x, 0)
+      box(g, MATTE_BLACK, 0.05, h - 0.42, 0.05, x, 0.42, d / 2 - 0.03)
+    }
+    for (let i = 0; i < 4; i++) box(g, WOOD, w, 0.03, 0.09, 0, 0.42, -d / 2 + 0.05 + i * 0.12)
+    for (let i = 0; i < 3; i++) box(g, WOOD, w, 0.08, 0.03, 0, 0.5 + i * 0.12, d / 2 - 0.03)
+    return g
+  },
+  'wall/boundary': ([w, d, h]) => {
+    // A rendered masonry wall with a coping on top.
+    const g = new THREE.Group()
+    box(g, surface('stucco-warm', mat('#e3d3bb', 0.9), '#e3d3bb'), w, h - 0.05, d)
+    box(g, mat('#cfc8bc', 0.8), w + 0.04, 0.05, d + 0.08, 0, h - 0.05)
+    return g
+  },
+  'stairs/horseshoe': (size, options) => stairs(size, options, 'stairs/horseshoe'),
+  'stairs/straight': (size, options) => stairs(size, options, 'stairs/straight'),
+}
+
+// Stairs from the same geometry the walker climbs: solid treads with a
+// stepped underside, a landing slab under the first steps, and a handrail
+// on the open side. `rise` is a full floor unless the item says otherwise.
+function stairs([w, d, h]: [number, number, number], options: BuildItemOptions, kind = 'stairs/horseshoe'): THREE.Group {
+  const g = new THREE.Group()
+  const s = stairGeometry(kind, w, d, options.rise ?? h)
+  const concrete = mat('#d9d4cb', 0.85)
+  const nosing = mat('#b9b2a6', 0.7)
+  // Plan x/y laid flat the same way floors are: the extrusion then runs up.
+  const shape = (polygon: [number, number][]) => new THREE.Shape(polygon.map(([x, y]) => new THREE.Vector2(x, y)))
+  for (const tread of s.treads) {
+    const bottom = Math.max(0, tread.top - 0.3)
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape(tread.polygon), { depth: tread.top - bottom, bevelEnabled: false }), concrete)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.y = bottom
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    g.add(mesh)
+  }
+  if (s.landing.length >= 3) {
+    const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape(s.landing), { depth: 0.15, bevelEnabled: false }), concrete)
+    slab.rotation.x = -Math.PI / 2
+    slab.position.y = -0.15
+    slab.receiveShadow = true
+    g.add(slab)
+  }
+  // Handrail along the inner edge: a post per tread, a rail between.
+  const railH = 0.95
+  let previous: THREE.Vector3 | undefined
+  for (const tread of s.treads) {
+    const [p] = tread.inner
+    const post = new THREE.Vector3(p[0], tread.top, -p[1])
+    const top = post.clone().setY(tread.top + railH)
+    cylinder(g, STEEL, 0.012, 0.012, railH, post.x, post.y, post.z)
+    if (previous) {
+      const from = previous
+      const to = top
+      const length = from.distanceTo(to)
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, length, 10), STEEL)
+      rail.position.copy(from).lerp(to, 0.5)
+      rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize())
+      g.add(rail)
+    }
+    previous = top
+  }
+  // Nosing strips make the steps read from a distance.
+  for (const tread of s.treads) {
+    const [a, b] = [tread.polygon[0], tread.polygon[1]]
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1])
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.012, 0.04), nosing)
+    strip.position.set((a[0] + b[0]) / 2, tread.top + 0.004, -(a[1] + b[1]) / 2)
+    strip.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0])
+    g.add(strip)
+  }
+  return g
 }
 
 // A standing adult, 1.75 m, eyes at about 1.63 m: the scale figure that
@@ -421,13 +728,14 @@ export function textSprite(text: string, y: number, scale = 0.35): THREE.Sprite 
 }
 
 // Pieces that rest on something else, or lie flat, cast no contact shadow.
-const NO_CONTACT = new Set(['rug/area', 'kitchen/wall-cabinets'])
+const NO_CONTACT = new Set(['rug/area', 'kitchen/wall-cabinets', 'railing/glass', 'lift/doors'])
 
-export function buildItem(asset: string, label: string, size?: [number, number, number]): THREE.Group {
+export function buildItem(asset: string, label: string, size?: [number, number, number], options: BuildItemOptions = {}): THREE.Group {
   const info = findAsset(asset)
   const builder = BUILDERS[asset]
-  const group = info && builder ? builder(info.size) : placeholder(label, size ?? [0.5, 0.5, 0.5])
-  const [w, d] = info?.size ?? size ?? [0.5, 0.5, 0.5]
+  const measure = info ? (info.resizable && size ? size : info.size) : (size ?? [0.5, 0.5, 0.5])
+  const group = info && builder ? builder(measure, options) : placeholder(label, measure)
+  const [w, d] = measure
   if (info?.model && hasModel(info.model)) {
     // The primitive piece stands in until the model arrives, then steps
     // aside; glTF fronts face +z, so the default turn is half a circle.
@@ -435,10 +743,10 @@ export function buildItem(asset: string, label: string, size?: [number, number, 
     loadModel(info.model).then((model) => {
       if (!model) return
       for (const child of stand) group.remove(child)
-      group.add(fitModel(model, info.size, info.yaw ?? 180))
+      group.add(fitModel(model, measure, info.yaw ?? 180))
     })
   }
-  if (!NO_CONTACT.has(asset)) {
+  if (!NO_CONTACT.has(asset) && !info?.passable && info?.category !== 'column') {
     // Interior lights cast no shadows (too slow), so a soft dark patch
     // under each piece keeps it from looking like it floats.
     const shadow = new THREE.Mesh(

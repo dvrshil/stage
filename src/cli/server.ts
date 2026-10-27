@@ -21,6 +21,8 @@ const TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.hdr': 'application/octet-stream',
   '.glb': 'model/gltf-binary',
   '.svg': 'image/svg+xml',
@@ -123,6 +125,16 @@ export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
         } catch (error) {
           return send(response, 200, { error: `${path}: ${(error as Error).message}` })
         }
+      }
+
+      // A file the scene names, like a level's plan drawing, from beside it.
+      if (url.pathname === '/api/file') {
+        const folder = dirname(path)
+        const file = normalize(join(folder, url.searchParams.get('file') ?? ''))
+        if (!file.startsWith(folder + '/') || !existsSync(file) || statSync(file).isDirectory()) return send(response, 404, { error: 'no such file beside the scene' })
+        response.writeHead(200, { 'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' })
+        createReadStream(file).pipe(response)
+        return
       }
 
       if (url.pathname === '/api/events') {

@@ -25,11 +25,13 @@ Viewer:
 Commands that need no display:
   new <path> [--name N] [--from flat]  Start a scene, empty or from an example
   check <scene>                        Report every problem, with its entity and a fix
-  render <scene> -o out.png [--camera id] [--size 1280x720]
+  render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]
+                                       Cameras: orbit, plan, plan:<level>, or a camera id
   query <scene> <question...>          ${QUESTIONS.join(' | ')}
   set <scene> <collection> '<json>'    Add an entity, or replace the one with its id
   remove <scene> <id>                  Remove an entity
-  show <scene> [--camera id] [--focus id]  Point every open viewer at a camera or an entity
+  show <scene> [--camera id] [--level id] [--focus id]
+                                       Point every open viewer at a camera, level, or entity
   assets [words...] [--category c]     Search the asset library
   assets fetch [--resolution 1k]       Download the CC0 textures and sky into the local cache
   materials                            List the built-in materials
@@ -68,6 +70,7 @@ async function main(argv: string[]): Promise<number> {
       json: { type: 'boolean' },
       out: { type: 'string', short: 'o' },
       camera: { type: 'string' },
+      level: { type: 'string' },
       focus: { type: 'string' },
       size: { type: 'string' },
       name: { type: 'string' },
@@ -121,7 +124,7 @@ async function main(argv: string[]): Promise<number> {
       }
       const renderer = await Renderer.start()
       try {
-        const png = await renderer.render(scene, { camera: values.camera as string | undefined, width, height })
+        const png = await renderer.render(scene, { camera: values.camera as string | undefined, level: values.level as string | undefined, width, height })
         const target = resolve(out)
         mkdirSync(dirname(target), { recursive: true })
         const temporary = `${target}.${process.pid}.tmp`
@@ -166,7 +169,7 @@ async function main(argv: string[]): Promise<number> {
 
     case 'show': {
       if (!scene) return fail('stage show <scene> --camera <id> | --focus <id>')
-      const viewers = await control(scene, { camera: values.camera as string | undefined, focus: values.focus as string | undefined })
+      const viewers = await control(scene, { camera: values.camera as string | undefined, level: values.level as string | undefined, focus: values.focus as string | undefined })
       json ? print({ ok: true, viewers }) : print(viewers ? `Showed it in ${viewers} viewer${viewers === 1 ? '' : 's'}` : 'No viewer has this scene open; run: stage open <scene>')
       return 0
     }

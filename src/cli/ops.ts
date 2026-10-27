@@ -120,7 +120,7 @@ export async function openViewer(scene: string, browser = true): Promise<string>
 }
 
 // Asks every open viewer of this scene to switch camera or focus an entity.
-export async function control(scene: string, message: { camera?: string; focus?: string }): Promise<number> {
+export async function control(scene: string, message: { camera?: string; focus?: string; level?: string }): Promise<number> {
   const base = await ensureLiveServer()
   const response = await fetch(`${base}/api/control?path=${encodeURIComponent(resolve(scene))}`, {
     method: 'POST',

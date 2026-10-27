@@ -25,6 +25,12 @@ test('the same scene renders the same pixels', async () => {
   assert.equal(hash(first), hash(second))
 })
 
+test('a plan of one level renders over the levels below', async () => {
+  const house = new URL('../examples/two-storey/scene.json', import.meta.url).pathname
+  const png = await renderer.render(house, { camera: 'plan:first', width: 480, height: 270, timeout: 90000 })
+  assert.ok(png.length > 10000)
+})
+
 test('every example camera renders', async () => {
   for (const camera of ['orbit', 'plan', 'from-door', 'kitchen-view']) {
     const png = await renderer.render(scene, { camera, width: 480, height: 270, timeout: 90000 })

@@ -64,12 +64,12 @@ export async function runMcp(): Promise<void> {
   server.registerTool(
     'show',
     {
-      description: "Point the person's open viewer at a camera (a camera id, or 'orbit' or 'plan') or fly to an entity and outline it. Use it to show what you are talking about.",
-      inputSchema: { scene: scenePath, camera: z.string().optional(), focus: z.string().optional().describe('An entity id to fly to and outline') },
+      description: "Point the person's open viewer at a camera (a camera id, or 'orbit' or 'plan'), show a level (that one and the ones below it), or fly to an entity and outline it. Use it to show what you are talking about.",
+      inputSchema: { scene: scenePath, camera: z.string().optional(), level: z.string().optional().describe('A level id: show it and the levels below it'), focus: z.string().optional().describe('An entity id to fly to and outline') },
     },
-    ({ scene, camera, focus }) =>
+    ({ scene, camera, level, focus }) =>
       guarded(async () => {
-        const viewers = await control(resolve(scene), { camera, focus })
+        const viewers = await control(resolve(scene), { camera, level, focus })
         return [text(viewers ? `shown in ${viewers} viewer${viewers === 1 ? '' : 's'}` : 'no viewer has this scene open; call open_viewer first')]
       }),
   )
@@ -83,19 +83,20 @@ export async function runMcp(): Promise<void> {
   server.registerTool(
     'render',
     {
-      description: "Render the scene headlessly and return the image. Cameras: 'orbit' (overview from the southwest, the default), 'plan' (top-down with room labels), or any camera id in the scene. Look after every few edits.",
+      description: "Render the scene headlessly and return the image. Cameras: 'orbit' (overview from the southwest, the default), 'plan' (top-down with room labels, over the level's plan drawing when it has one), or any camera id in the scene. With several levels, pass `level` to look at that level with the ones above hidden. Look after every few edits.",
       inputSchema: {
         scene: scenePath,
         camera: z.string().optional(),
+        level: z.string().optional().describe('A level id: show it and the levels below it'),
         width: z.number().int().min(320).max(1920).default(1024),
         height: z.number().int().min(240).max(1080).default(640),
       },
     },
-    ({ scene, camera, width, height }) =>
+    ({ scene, camera, level, width, height }) =>
       guarded(async () => {
         const result = await checkScene(scene)
         if (!result.ok) return [text(`${problems(result)}\nfix the errors before rendering`)]
-        const png = await (await getRenderer()).render(resolve(scene), { camera, width, height })
+        const png = await (await getRenderer()).render(resolve(scene), { camera, level, width, height })
         return [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }, text(problems(result))]
       }),
   )

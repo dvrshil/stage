@@ -8,11 +8,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { findAsset } from '../core/assets.ts'
 import { check, type Problem } from '../core/check.ts'
-import { centroid, pointInPolygon, sceneBounds, type Point } from '../core/geometry.ts'
-import { obstacles, resolve as resolveWalk, type Obstacles } from '../core/walk.ts'
+import { centroid, levelsByElevation, pointInPolygon, roomElevation, roomHeight, sceneBounds, type Point } from '../core/geometry.ts'
+import { STEP, ground, obstacles, resolve as resolveWalk, type Obstacles } from '../core/walk.ts'
 import { SKY } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
-import { applyCutaway, buildScene, toWorld, type Built } from './build.ts'
+import { applyCutaway, buildScene, floorMaterial, toWorld, type Built } from './build.ts'
 import { useSurfaces } from './furniture.ts'
 import { loadLibrary, loadSky, settled, type Sky } from './library.ts'
 import { speckle } from './textures.ts'
@@ -54,7 +54,8 @@ world.add(hemisphere)
 // A drawn gradient until the photographed sky loads.
 const dome = sky()
 world.add(dome)
-world.add(lawn())
+const lawnMesh = lawn()
+world.add(lawnMesh)
 
 function sky(): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
@@ -143,6 +144,11 @@ function alignSky() {
 type View = 'orbit' | 'plan' | 'camera' | 'walk' | 'focus'
 let view: View = 'orbit'
 let scene: Scene | undefined
+// Levels from the lowest up, and the highest one shown: everything above
+// it is hidden, so an overview or a plan looks into that floor.
+let levels: Scene['levels'] = []
+let cap = Infinity
+let planLevel = 0
 let built: Built | undefined
 let previous = new Map<string, string>()
 const highlights: { helper: THREE.BoxHelper; until: number }[] = []
@@ -165,6 +171,7 @@ window.addEventListener('resize', resize)
 function fitPlan() {
   if (!scene) return
   const b = sceneBounds(scene)
+  const level = levels[Math.min(planLevel, levels.length - 1)]
   const margin = 1
   const cx = (b.min[0] + b.max[0]) / 2
   const cy = (b.min[1] + b.max[1]) / 2
@@ -176,10 +183,56 @@ function fitPlan() {
   plan.right = halfW
   plan.top = halfH
   plan.bottom = -halfH
-  plan.position.copy(toWorld([cx, cy], 50))
+  // Just above the level's ceiling; the levels above are hidden anyway.
+  const top = level ? level.elevation + level.height + 3 : 50
+  plan.position.copy(toWorld([cx, cy], top))
+  plan.near = 0.1
+  plan.far = top + 20
   plan.up.set(0, 0, -1)
   plan.lookAt(toWorld([cx, cy], 0))
   plan.updateProjectionMatrix()
+}
+
+// Hides everything on levels above the cap, and shows the plan drawing
+// of the level a plan view looks at.
+function applyLevelCap() {
+  if (!built) return
+  const show = (object: THREE.Object3D) => {
+    const level = object.userData.level as number | undefined
+    if (level !== undefined) object.visible = level <= cap
+  }
+  for (const child of built.root.children) if (!child.userData.wall) show(child)
+  // A plan labels its own level; the overview labels every level it shows.
+  // A plan labels its own level; the overview labels the highest level it
+  // shows, so a tall house isn't buried in tags.
+  const top = view === 'plan' ? planLevel : Math.min(cap, levels.length - 1)
+  for (const label of built.labels.children) {
+    const level = label.userData.level as number | undefined
+    label.visible = level === undefined || level === top
+  }
+  for (const [id, overlay] of built.overlays) overlay.visible = view === 'plan' && levels[planLevel]?.id === id
+  const select = document.querySelector<HTMLSelectElement>('#levels')
+  if (select) select.value = String(Math.min(cap, levels.length - 1))
+}
+
+function levelIndexOf(id: string | null | undefined): number | undefined {
+  if (!id) return undefined
+  const index = levels.findIndex((l) => l.id === id)
+  return index >= 0 ? index : undefined
+}
+
+function setCap(index: number) {
+  cap = index >= levels.length - 1 ? Infinity : Math.max(0, index)
+  if (view === 'plan') {
+    planLevel = Math.min(index, levels.length - 1)
+    fitPlan()
+    $('camera').textContent = planLabel()
+  }
+  applyLevelCap()
+}
+
+function planLabel(): string {
+  return levels.length > 1 ? `camera: plan · ${levels[planLevel]?.name ?? levels[planLevel]?.id}` : 'camera: plan'
 }
 
 // What each view shows: ceilings and room lights inside, room labels and
@@ -189,8 +242,9 @@ function applyView(next: View, label: string) {
   if (built) built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
   inside = undefined
   $('camera').textContent = label
+  applyLevelCap()
   for (const button of document.querySelectorAll<HTMLButtonElement>('#toolbar button')) {
-    button.classList.toggle('active', button.dataset.camera === label.replace(/^.*: /, ''))
+    button.classList.toggle('active', button.dataset.camera === label.replace(/^.*: /, '').replace(/ · .*$/, ''))
   }
 }
 
@@ -201,9 +255,15 @@ let inside: boolean | undefined
 function updateInside() {
   if (!built || !scene) return
   const p = perspective.position
-  const room = active === perspective ? scene.rooms.find((r) => pointInPolygon([p.x, -p.z], r.floor)) : undefined
-  const level = room && scene.levels.find((l) => l.id === room.level)
-  const now = !!room && p.y < (level?.elevation ?? 0) + (room.height ?? level?.height ?? 2.7) - 0.02
+  const room =
+    active === perspective
+      ? scene.rooms.find((r) => {
+          if (r.open || !pointInPolygon([p.x, -p.z], r.floor)) return false
+          const floor = roomElevation(scene!, r)
+          return p.y > floor - 0.3 && p.y < floor + roomHeight(scene!, r) - 0.02
+        })
+      : undefined
+  const now = !!room
   if (now === inside) return
   inside = now
   for (const object of built.indoor) object.visible = now
@@ -219,8 +279,10 @@ function overview() {
   const b = sceneBounds(scene)
   const cx = (b.min[0] + b.max[0]) / 2
   const cy = (b.min[1] + b.max[1]) / 2
-  const size = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], 4)
-  const target = toWorld([cx, cy], 0.5)
+  const top = levels[Math.min(levels.length - 1, cap)] ?? levels.at(-1)
+  const height = top ? top.elevation + top.height : 3
+  const size = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], height * 1.6, 4)
+  const target = toWorld([cx, cy], Math.min(height / 2, 2))
   perspective.fov = 40
   perspective.updateProjectionMatrix()
   orbit.target.copy(target)
@@ -230,17 +292,24 @@ function overview() {
 function useCamera(id: string) {
   if (!scene) return
   if (look.isLocked) look.unlock()
-  const camera = scene.cameras.find((c) => c.id === id)
-  if (id === 'plan' || camera?.type === 'plan') {
+  // "plan:first" or "orbit:first" looks at that level and the ones below.
+  const [name, levelId] = id.split(':')
+  const camera = scene.cameras.find((c) => c.id === name)
+  const wanted = levelIndexOf(levelId ?? camera?.level)
+  if (name === 'plan' || camera?.type === 'plan') {
     active = plan
     orbit.enabled = false
+    view = 'plan'
+    planLevel = wanted ?? (cap === Infinity ? levels.length - 1 : Math.min(cap, levels.length - 1))
+    cap = planLevel >= levels.length - 1 ? Infinity : planLevel
     fitPlan()
-    applyView('plan', 'camera: plan')
+    applyView('plan', planLabel())
     return
   }
   active = perspective
   orbit.enabled = true
-  if (id === 'orbit' || !camera?.at || !camera.look) {
+  if (name === 'orbit' || !camera?.at || !camera.look) {
+    if (wanted !== undefined) cap = wanted >= levels.length - 1 ? Infinity : wanted
     overview()
     applyView('orbit', 'camera: orbit')
   } else {
@@ -255,11 +324,28 @@ function useCamera(id: string) {
 
 // ---- Walking --------------------------------------------------------------
 
-let blocking: Obstacles = { walls: [], solids: [] }
-const resolve = (p: Point) => resolveWalk(p, blocking)
+let blocking: Obstacles = { walls: [], solids: [], floors: [], stairs: [] }
+// Where the feet are: the floor or stair under the person, in meters.
+let foot = 0
+let eyeHeight = EYE
+const resolve = (p: Point) => resolveWalk(p, blocking, undefined, foot)
 
 function insideAnyRoom(p: Point): boolean {
   return !!scene?.rooms.some((room) => pointInPolygon(p, room.floor))
+}
+
+// The floor nearest a height, for a person arriving from a camera.
+function standOn(p: Point, near: number): number {
+  let best = near
+  let gap = Infinity
+  for (const f of blocking.floors) {
+    const d = Math.abs(f.elevation - near)
+    if (d < gap && pointInPolygon(p, f.polygon)) {
+      best = f.elevation
+      gap = d
+    }
+  }
+  return best
 }
 
 function startWalk() {
@@ -270,16 +356,21 @@ function startWalk() {
   perspective.updateProjectionMatrix()
   velocity.set(0, 0)
   let at: Point = [perspective.position.x, -perspective.position.z]
+  let z = perspective.position.y - EYE
   // From an overview, step in at the first eye-level camera, or the middle
   // of the first room.
   if (view === 'orbit' || view === 'plan' || view === 'focus' || !insideAnyRoom(at)) {
     const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
     at = camera?.at ? [camera.at[0], camera.at[1]] : centroid(scene.rooms[0].floor)
-    perspective.position.copy(toWorld(resolve(at), EYE))
-    if (camera?.look) perspective.lookAt(toWorld([camera.look[0], camera.look[1]], EYE))
+    z = camera?.at ? camera.at[2] - EYE : roomElevation(scene, scene.rooms[0])
+    foot = standOn(at, z)
+    perspective.position.copy(toWorld(resolve(at), foot + EYE))
+    if (camera?.look) perspective.lookAt(toWorld([camera.look[0], camera.look[1]], foot + EYE))
   } else {
-    perspective.position.copy(toWorld(resolve(at), EYE))
+    foot = standOn(at, z)
+    perspective.position.copy(toWorld(resolve(at), foot + EYE))
   }
+  eyeHeight = foot + EYE
   applyView('walk', 'camera: walk')
   look.lock()
 }
@@ -307,11 +398,23 @@ function walkStep(delta: number) {
     return
   }
   const here: Point = [perspective.position.x, -perspective.position.z]
-  const next = resolve([here[0] + velocity.x * delta, here[1] + velocity.y * delta])
+  let next = resolve([here[0] + velocity.x * delta, here[1] + velocity.y * delta])
+  // Nothing to stand on, or a drop or climb bigger than a step: stay put.
+  // A railing would stop you in a real house; here the edge itself does.
+  const below = ground(next, blocking, foot)
+  if (below === undefined || Math.abs(below - foot) > STEP) {
+    next = here
+    velocity.set(0, 0)
+  } else {
+    foot = below
+  }
   // What the walls took away is gone from the velocity too, so pressing
   // into a wall doesn't build up speed that jerks you along when it ends.
   velocity.set((next[0] - here[0]) / delta, (next[1] - here[1]) / delta)
-  perspective.position.set(next[0], EYE, -next[1])
+  // The eyes follow the feet with a little lag, so stairs feel like stairs
+  // rather than a lift.
+  eyeHeight += (foot + EYE - eyeHeight) * (1 - Math.exp(-delta * 14))
+  perspective.position.set(next[0], eyeHeight, -next[1])
 }
 
 window.addEventListener('keydown', (event) => {
@@ -322,6 +425,7 @@ window.addEventListener('keydown', (event) => {
   else if (key === 'o') useCamera('orbit')
   else if (key === 'p') useCamera('plan')
   else if (key === 'v') startWalk()
+  else if (key === '[' || key === ']') setCap(Math.min(cap, levels.length - 1) + (key === ']' ? 1 : -1))
   else if (key === 'q') setQuality(quality === 'high' ? 'fast' : 'high', quality === 'high' ? 'Fast rendering: press Q for high quality.' : 'High quality.')
   else if (key === 'l') {
     labelsOn = !labelsOn
@@ -362,6 +466,21 @@ function buildToolbar() {
     button.dataset.camera = id
     button.addEventListener('click', () => useCamera(id))
     toolbar.append(button)
+  }
+  if (levels.length > 1) {
+    // Which levels to show: this one and the ones below it.
+    const select = document.createElement('select')
+    select.id = 'levels'
+    select.title = 'Show this level and the ones below it ([ and ] keys)'
+    levels.forEach((level, index) => {
+      const option = document.createElement('option')
+      option.value = String(index)
+      option.textContent = index === levels.length - 1 ? 'All levels' : `Up to ${level.name ?? level.id}`
+      select.append(option)
+    })
+    select.value = String(Math.min(cap, levels.length - 1))
+    select.addEventListener('change', () => setCap(Number(select.value)))
+    toolbar.append(select)
   }
   const walk = document.createElement('button')
   walk.textContent = 'Walk inside'
@@ -491,7 +610,10 @@ async function load(first: boolean): Promise<void> {
 
   if (built) world.remove(built.root)
   scene = next
-  built = buildScene(next)
+  levels = levelsByElevation(next)
+  if (cap !== Infinity && cap >= levels.length - 1) cap = Infinity
+  planLevel = Math.min(planLevel, levels.length - 1)
+  built = buildScene(next, { fileUrl: (relative) => `./api/file?path=${encodeURIComponent(scenePath)}&file=${encodeURIComponent(relative)}` })
   world.add(built.root)
   blocking = obstacles(next)
   alignSky()
@@ -516,6 +638,8 @@ async function load(first: boolean): Promise<void> {
 
   if (first) {
     resize()
+    const wanted = levelIndexOf(params.get('level'))
+    if (wanted !== undefined) cap = wanted >= levels.length - 1 ? Infinity : wanted
     if (!restoreView()) useCamera(params.get('camera') ?? 'orbit')
   } else {
     fitPlan()
@@ -537,16 +661,17 @@ const stateKey = `stage:view:${scenePath}`
 function saveView() {
   if (headless || !scene) return
   try {
-    sessionStorage.setItem(stateKey, JSON.stringify({ view, label: $('camera').textContent, position: perspective.position.toArray(), target: orbit.target.toArray(), fov: perspective.fov }))
+    sessionStorage.setItem(stateKey, JSON.stringify({ view, label: $('camera').textContent, position: perspective.position.toArray(), target: orbit.target.toArray(), fov: perspective.fov, cap: cap === Infinity ? null : cap, planLevel }))
   } catch {}
 }
 function restoreView(): boolean {
   if (headless || params.has('camera')) return false
   try {
-    const saved = JSON.parse(sessionStorage.getItem(stateKey) ?? 'null') as { view: View; label: string; position: number[]; target: number[]; fov: number } | null
+    const saved = JSON.parse(sessionStorage.getItem(stateKey) ?? 'null') as { view: View; label: string; position: number[]; target: number[]; fov: number; cap: number | null; planLevel?: number } | null
     if (!saved) return false
+    cap = saved.cap === null || saved.cap === undefined ? Infinity : saved.cap
     if (saved.view === 'plan') {
-      useCamera('plan')
+      useCamera(`plan:${levels[saved.planLevel ?? levels.length - 1]?.id ?? ''}`)
       return true
     }
     active = perspective
@@ -581,8 +706,10 @@ function listen() {
   const events = new EventSource(`./api/events?path=${encodeURIComponent(scenePath)}`)
   events.addEventListener('change', () => load(false).catch((error) => setStatus(escape(String(error.message ?? error)))))
   events.addEventListener('control', (event) => {
-    const message = JSON.parse((event as MessageEvent).data) as { camera?: string; focus?: string }
-    if (message.camera) useCamera(message.camera)
+    const message = JSON.parse((event as MessageEvent).data) as { camera?: string; focus?: string; level?: string }
+    const wanted = levelIndexOf(message.level)
+    if (wanted !== undefined && !message.camera) setCap(wanted)
+    if (message.camera) useCamera(wanted !== undefined && !message.camera.includes(':') ? `${message.camera}:${message.level}` : message.camera)
     if (message.focus) focus(message.focus)
   })
   // A new viewer build reloads the page, keeping the view.
@@ -613,7 +740,7 @@ function frame() {
     }
   }
   updateInside()
-  if (built) applyCutaway(built.root, active, !inside, active === perspective)
+  if (built) applyCutaway(built.root, active, !inside, active === perspective, view === 'orbit' || view === 'focus', cap)
   // Ambient occlusion only once the view holds still: moving stays smooth,
   // and the finished picture fills in a fifth of a second after you stop.
   perspective.updateMatrixWorld()
@@ -644,6 +771,7 @@ async function start() {
     phase('library')
     await loadLibrary()
     useSurfaces()
+    lawnMesh.material = floorMaterial('grass')
     phase('scene')
     await load(true)
     phase('sky')

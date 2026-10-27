@@ -9,7 +9,7 @@ import { check } from '../src/core/check.ts'
 import { distanceToSegment, walls, wallPieces } from '../src/core/geometry.ts'
 import { query } from '../src/core/query.ts'
 import { format, readScene, writeScene } from '../src/core/store.ts'
-import { BODY_RADIUS, obstacles, resolve } from '../src/core/walk.ts'
+import { BODY_RADIUS, ground, obstacles, resolve } from '../src/core/walk.ts'
 
 const example = async () => (await readScene(new URL('../examples/flat/scene.json', import.meta.url).pathname)) as any
 const clone = <T>(value: T): T => structuredClone(value)
@@ -168,4 +168,80 @@ test('furniture stops a person; rugs do not', async () => {
   // Walking north from the TV into the coffee table at [2.2, 2.1].
   const end = walk([2.2, 1.2], [0, 1], 60, blocking).at(-1)!
   assert.ok(end[1] < 2.1 - 0.3)
+})
+
+// Several levels: walls stack, edges split where rooms meet, stairs climb.
+
+const house = async () => (await readScene(new URL('../examples/two-storey/scene.json', import.meta.url).pathname)) as any
+
+test('rooms stacked on two levels get one wall per level, not one tall wall', async () => {
+  const scene = check(await house()).scene!
+  const all = walls(scene)
+  // The hall's south edge (y 0, x 0..6) is also the lounge's, one floor up.
+  const south = all.filter((w) => w.a[1] === 0 && w.b[1] === 0 && Math.min(w.a[0], w.b[0]) === 0)
+  // Hall, lounge, and the roof terrace's parapet: three walls, one above the other.
+  assert.equal(south.length, 3)
+  assert.deepEqual(south.map((w) => w.elevation).sort(), [0, 3.15, 6])
+  // The ground floor wall stands on the ground, through the plinth, and rises through the slab above.
+  const ground = south.find((w) => w.elevation === 0)!
+  assert.ok(Math.abs(ground.height - 3.15) < 0.01)
+})
+
+test('an edge that meets a shorter room is split, so the shared part is one wall', async () => {
+  const scene = check(await house()).scene!
+  const all = walls(scene)
+  // The hall's north edge runs 0..6; the stair (0..5) and store (5..6) meet it.
+  const north = all.filter((w) => w.a[1] === 4 && w.b[1] === 4 && w.elevation === 0)
+  assert.equal(north.length, 2)
+  const shared = north.find((w) => Math.max(w.a[0], w.b[0]) === 5)!
+  assert.deepEqual([...shared.rooms].sort(), ['hall', 'stair-g'])
+  assert.equal(shared.exterior, false)
+})
+
+test('an open room gets a parapet only where nothing else stands', async () => {
+  const scene = check(await house()).scene!
+  const all = walls(scene)
+  const terrace = all.filter((w) => w.rooms.includes('roof-terrace'))
+  assert.ok(terrace.length > 0)
+  for (const w of terrace) if (w.rooms.length === 1) assert.ok(Math.abs(w.height - 1) < 1e-6, `parapet is 1 m, not ${w.height}`)
+  // The porch (parapet 0) and the garden (0.5) meet: no wall between open rooms.
+  assert.ok(!all.some((w) => w.rooms.includes('porch') && w.rooms.includes('garden')))
+})
+
+test('a person climbs the horseshoe stair and cannot step into the well', async () => {
+  const scene = check(await house()).scene!
+  const blocking = obstacles(scene)
+  // Up from the south-west corner of the stair, around, and east: the top
+  // lands at the first floor.
+  const bottom = ground([0.5, 4.05], blocking, 0.3)!
+  assert.ok(bottom < 0.5, `starts near the floor, got ${bottom}`)
+  let foot = 0.3
+  const corners: [number, number][] = [[0.5, 4.1], [0.5, 4.3], [0.6, 4.9], [1.2, 5.3], [2.5, 5.3], [3.8, 5.3], [4.4, 4.9], [4.5, 4.3]]
+  // Ten-centimeter steps along the walking line, the way a person moves.
+  for (let i = 0; i + 1 < corners.length; i++) {
+    const [a, b] = [corners[i], corners[i + 1]]
+    const steps = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1)
+    for (let k = 1; k <= steps; k++) {
+      const p: [number, number] = [a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps]
+      const h = ground(p, blocking, foot)
+      assert.ok(h !== undefined && h >= foot - 0.01, `climbs at [${p}]: ${h} from ${foot}`)
+      foot = h
+    }
+  }
+  assert.ok(Math.abs(foot - 3.15) < 0.3, `arrives at the first floor, got ${foot}`)
+  // The well in the middle has no floor on the first level: nowhere to stand.
+  assert.equal(ground([2.5, 4.3], blocking, 3.15), undefined)
+  // And from the ground floor, the well is just floor.
+  assert.equal(ground([2.5, 4.3], blocking, 0.3), 0.3)
+})
+
+test('walls on another level never block a person', async () => {
+  const scene = check(await house()).scene!
+  const blocking = obstacles(scene)
+  // The lounge upstairs has no wall at x 5 (the store is below); walking
+  // east across it at the first floor passes, at the ground floor it stops.
+  const upstairs = walk([4.5, 4.5], [1, 0], 60, { ...blocking, walls: blocking.walls.filter((w) => w.bottom < 3.15 + 1.4 && w.top > 3.15 + 0.25) })
+  assert.ok(upstairs.at(-1)![0] > 5.3, 'nothing in the way upstairs')
+  const [x] = resolve([5.5, 4.5], blocking, undefined, 0.3)
+  assert.ok(x <= 5.5, 'the store wall is there on the ground floor')
 })
