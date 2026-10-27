@@ -1,0 +1,61 @@
+:root {
+  --panel: rgba(18, 18, 22, 0.78);
+  --text: #f1efe9;
+  --muted: #a9a6a0;
+  --accent: #e8b43a;
+  --error: #ff8a7a;
+  --warning: #f0c060;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #e8e5df;
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+
+canvas#view { display: block; width: 100vw; height: 100vh; }
+
+.hud { position: fixed; inset: 0; pointer-events: none; }
+.hud .top { position: absolute; top: 16px; left: 16px; display: flex; gap: 10px; align-items: center; }
+.hud .bottom { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; max-width: min(560px, calc(100vw - 32px)); }
+
+.title, .chip, .panel {
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.title { font-weight: 600; font-size: 15px; }
+.chip { color: var(--muted); font-size: 13px; }
+.panel { pointer-events: auto; }
+.hidden { display: none !important; }
+
+#status .live { color: var(--accent); font-weight: 600; }
+#status.flash { outline: 2px solid var(--accent); }
+.problems { max-height: 30vh; overflow: auto; font-size: 12.5px; }
+.problems .error { color: var(--error); }
+.problems .warning { color: var(--warning); }
+.problems div + div { margin-top: 4px; }
+#selection code, .problems code { color: var(--accent); }
+
+.help { position: absolute; top: 60px; right: 16px; display: grid; gap: 4px; }
+.help-title { font-weight: 600; margin-bottom: 4px; }
+.hint { position: absolute; top: 16px; right: 16px; background: var(--panel); border-radius: 8px; padding: 6px 10px; color: var(--muted); font-size: 13px; }
+
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  font: 12px ui-monospace, monospace;
+  text-align: center;
+  color: var(--text);
+}
+
+body.headless .hud { display: none; }

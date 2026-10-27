@@ -1,0 +1,4 @@
+#!/bin/sh
+# Node strips the types itself, so there is no build step for the command line.
+HERE="$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)"
+exec node --no-warnings "$HERE/../src/cli/index.ts" "$@"
