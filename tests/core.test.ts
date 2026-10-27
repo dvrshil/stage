@@ -6,9 +6,10 @@ import { test } from 'node:test'
 import { measureGltf } from '../src/cli/assets.ts'
 import { searchAssets } from '../src/core/assets.ts'
 import { check } from '../src/core/check.ts'
-import { walls, wallPieces } from '../src/core/geometry.ts'
+import { distanceToSegment, walls, wallPieces } from '../src/core/geometry.ts'
 import { query } from '../src/core/query.ts'
 import { format, readScene, writeScene } from '../src/core/store.ts'
+import { BODY_RADIUS, obstacles, resolve } from '../src/core/walk.ts'
 
 const example = async () => (await readScene(new URL('../examples/flat/scene.json', import.meta.url).pathname)) as any
 const clone = <T>(value: T): T => structuredClone(value)
@@ -116,4 +117,55 @@ test('model sizes come from glTF bounds through node transforms', () => {
   }
   // Width 1 by depth 0.5, turned 90 degrees, then doubled: 1 wide, 2 deep, 2 high.
   assert.deepEqual(measureGltf(gltf), [1, 2, 2])
+})
+
+// Walking: a person of radius 0.2 m, stepping 2 cm at a time.
+
+const walk = (start: [number, number], direction: [number, number], steps: number, blocking: ReturnType<typeof obstacles>) => {
+  const path: [number, number][] = [start]
+  let p = start
+  for (let i = 0; i < steps; i++) {
+    p = resolve([p[0] + direction[0] * 0.02, p[1] + direction[1] * 0.02], blocking)
+    path.push(p)
+  }
+  return path
+}
+
+test('walking into a wall at an angle glides along it, never into it', async () => {
+  const scene = check(await example()).scene!
+  const blocking = obstacles({ ...scene, items: [] })
+  // From mid living room, heading north-east into the north wall.
+  const path = walk([2.5, 3.0], [Math.SQRT1_2, Math.SQRT1_2], 120, blocking)
+  const north = blocking.walls.find((w) => w.a[1] === 4 && w.b[1] === 4)!
+  for (const [, y] of path) assert.ok(4 - y >= north.half + BODY_RADIUS - 1e-6, `stays clear of the wall at y ${y}`)
+  // Still moving east once against the wall: sliding, not stuck.
+  const tail = path.slice(-20)
+  assert.ok(tail.at(-1)![0] - tail[0][0] > 0.2)
+})
+
+test('a position inside a wall is pushed out, and a corner holds still', async () => {
+  const scene = check(await example()).scene!
+  const blocking = obstacles({ ...scene, items: [] })
+  const [x, y] = resolve([0.05, 0.05], blocking)
+  for (const w of blocking.walls) assert.ok(distanceToSegment([x, y], w.a, w.b) >= w.half + BODY_RADIUS - 1e-6)
+  const path = walk([1, 1], [-Math.SQRT1_2, -Math.SQRT1_2], 100, blocking)
+  const [a, b] = path.slice(-2)
+  assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6, 'settles in the corner without jitter')
+})
+
+test('a person walks through the pass-through but not the wall beside it', async () => {
+  const scene = check(await example()).scene!
+  const blocking = obstacles({ ...scene, items: [] })
+  // The opening spans y 0.75 to 3.25 on the wall at x 5.5.
+  assert.ok(walk([4.5, 2.0], [1, 0], 100, blocking).at(-1)![0] > 6)
+  assert.ok(walk([4.5, 3.7], [1, 0], 100, blocking).at(-1)![0] < 5.5)
+})
+
+test('furniture stops a person; rugs do not', async () => {
+  const scene = check(await example()).scene!
+  const blocking = obstacles(scene)
+  assert.ok(!blocking.solids.some((s) => s.x === 2.2 && s.y === 2.3), 'the rug is passable')
+  // Walking north from the TV into the coffee table at [2.2, 2.1].
+  const end = walk([2.2, 1.2], [0, 1], 60, blocking).at(-1)!
+  assert.ok(end[1] < 2.1 - 0.3)
 })

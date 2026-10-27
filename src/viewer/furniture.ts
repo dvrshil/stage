@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { findAsset } from '../core/assets.ts'
 import { MATERIALS } from '../core/materials.ts'
 import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
-import { boxInMeters, contactShadow, cylinderInMeters } from './textures.ts'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { boxInMeters, contactShadow, cylinderInMeters, projectInMeters } from './textures.ts'
 
 // Furniture built from primitives, by asset id. Each builder returns a group
 // with its footprint centered on the origin, the floor at y = 0, and the
@@ -29,7 +30,18 @@ let RUG_FIELD = mat('#e3d2b8', 1)
 let RUG_BORDER = mat('#9b5d4a', 1)
 const LEAF = mat('#3e6b3a', 0.85)
 const POT = mat('#c4a484', 0.8)
-const SHADE = new THREE.MeshStandardMaterial({ color: '#f4ead2', roughness: 0.9, emissive: '#ffe8b0', emissiveIntensity: 0.4 })
+let SHADE = new THREE.MeshStandardMaterial({ color: '#f4ead2', roughness: 0.9, side: THREE.DoubleSide, emissive: '#ffdcaa', emissiveIntensity: 0.9 })
+let PILLOW = mat('#f4f1ea', 0.95)
+let HEADBOARD = mat('#8a8278', 0.95)
+// Metals and glass look right only with something to reflect, which the
+// photographed sky now gives them.
+const STEEL = mat('#c8cbcf', 0.28, 0.9)
+const BRASS = mat('#b08a4a', 0.3, 0.9)
+const MATTE_BLACK = mat('#1b1c1f', 0.6)
+const SCREEN = new THREE.MeshPhysicalMaterial({ color: '#06070a', roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04 })
+const WORKTOP = new THREE.MeshPhysicalMaterial({ color: '#2c2e33', roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.2 })
+const OVEN_GLASS = new THREE.MeshPhysicalMaterial({ color: '#0d0e10', roughness: 0.08, clearcoat: 1 })
+const FRONTS = mat('#efece5', 0.45)
 
 // A photographed surface from the library, tinted, or the plain material
 // when that texture set isn't downloaded.
@@ -42,13 +54,33 @@ function surface(name: string, fallback: THREE.MeshStandardMaterial, tint = '#ff
 // Called once the library has loaded, before the first build.
 export function useSurfaces() {
   WOOD = surface('oak-veneer', WOOD)
-  WOOD_DARK = surface('walnut-veneer', WOOD_DARK)
+  WOOD_DARK = surface('walnut-veneer', WOOD_DARK, '#8a6a52')
   LINEN = surface('linen', LINEN, '#f4f0e8')
   DUVET = surface('linen', DUVET, '#8797aa')
   FABRIC = surface('wool-herringbone', FABRIC, '#7d8b99')
   FABRIC_WARM = surface('wool-herringbone', FABRIC_WARM, '#b08c70')
   RUG_FIELD = surface('wool-herringbone', RUG_FIELD, '#ece2d0')
   RUG_BORDER = surface('wool-herringbone', RUG_BORDER, '#9b5d4a')
+  PILLOW = surface('linen', PILLOW, '#fbf8f2')
+  HEADBOARD = surface('wool-herringbone', HEADBOARD, '#8f877c')
+  const shade = surface('linen', SHADE, '#f6ecd8')
+  if (shade !== SHADE) {
+    shade.side = THREE.DoubleSide
+    shade.emissive = new THREE.Color('#ffdcaa')
+    shade.emissiveIntensity = 0.9
+    SHADE = shade
+  }
+}
+
+// A box with softened edges, for anything upholstered or stuffed.
+function soft(group: THREE.Group, material: THREE.Material, w: number, h: number, d: number, radius: number, x = 0, y = 0, z = 0) {
+  const r = Math.min(radius, w / 2, h / 2, d / 2) * 0.999
+  const mesh = new THREE.Mesh(projectInMeters(new RoundedBoxGeometry(w, h, d, 4, r)), material)
+  mesh.position.set(x, y + h / 2, z)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  group.add(mesh)
+  return mesh
 }
 
 // A box whose bottom sits at `y`, centered on x and z, with UVs in meters.
@@ -141,10 +173,16 @@ const BUILDERS: Record<string, Builder> = {
     return g
   },
   'lamp/floor': ([w, , h]) => {
+    // A linen drum on a brass pole, and the warm light it gives.
     const g = new THREE.Group()
-    cylinder(g, METAL, w * 0.4, w * 0.45, 0.03)
-    cylinder(g, METAL, 0.012, 0.012, h - 0.3, 0, 0.03)
-    cylinder(g, SHADE, w * 0.32, w * 0.48, 0.3, 0, h - 0.3)
+    cylinder(g, MATTE_BLACK, w * 0.4, w * 0.42, 0.025)
+    cylinder(g, BRASS, 0.011, 0.011, h - 0.36, 0, 0.025)
+    const shade = new THREE.Mesh(cylinderInMeters(w * 0.42, w * 0.48, 0.34, 40, true), SHADE)
+    shade.position.y = h - 0.17
+    g.add(shade)
+    const light = new THREE.PointLight('#ffd6a0', 2.2, 0, 2)
+    light.position.y = h - 0.2
+    g.add(light)
     return g
   },
   'kitchen/counter-two-meter': counter,
@@ -152,11 +190,13 @@ const BUILDERS: Record<string, Builder> = {
   'kitchen/wall-cabinets': wallCabinets,
   'person/standing': person,
   'kitchen/fridge': ([w, d, h]) => {
+    // Stainless doors, a freezer drawer below, and the dark seals between.
     const g = new THREE.Group()
-    box(g, mat('#d9dcdf', 0.3, 0.4), w, h, d)
-    box(g, METAL, 0.03, 0.5, 0.03, w / 2 - 0.08, h * 0.55, -d / 2 - 0.02)
-    box(g, METAL, 0.03, 0.3, 0.03, w / 2 - 0.08, h * 0.2, -d / 2 - 0.02)
-    box(g, mat('#bfc3c7', 0.4), w - 0.01, 0.01, 0.005, 0, h * 0.42, -d / 2 - 0.003)
+    soft(g, STEEL, w, h, d, 0.02)
+    box(g, MATTE_BLACK, w - 0.01, 0.008, 0.004, 0, h * 0.34, -d / 2 - 0.001)
+    box(g, MATTE_BLACK, 0.004, h - h * 0.34 - 0.02, 0.004, 0, h * 0.34 + 0.01, -d / 2 - 0.001)
+    for (const x of [-0.05, 0.05]) box(g, STEEL, 0.022, 0.55, 0.035, x, h * 0.52, -d / 2 - 0.025)
+    box(g, STEEL, w * 0.6, 0.022, 0.035, 0, h * 0.28, -d / 2 - 0.025)
     return g
   },
   'shelf/bookcase': ([w, d, h]) => {
@@ -191,24 +231,29 @@ const BUILDERS: Record<string, Builder> = {
     return g
   },
   'tv/stand': ([w, d, h]) => {
-    // A 55-inch screen: 1.22 by 0.69 m, 16:9, on a stand 45 cm high.
+    // A walnut console, a soundbar, and a 55-inch screen (1.22 by 0.69 m,
+    // 16:9) whose glass reflects the room the way a real one does.
     const g = new THREE.Group()
-    const stand = 0.45
-    box(g, WOOD_DARK, w, stand, d)
-    box(g, BLACK, 0.32, 0.02, 0.2, 0, stand, 0.05)
-    box(g, BLACK, 0.05, 0.1, 0.03, 0, stand + 0.02, 0.06)
+    const console = 0.45
+    soft(g, WOOD_DARK, w, console - 0.08, d, 0.012, 0, 0.08)
+    for (const x of [-w / 2 + 0.08, w / 2 - 0.08]) box(g, MATTE_BLACK, 0.03, 0.08, d - 0.08, x)
+    for (let i = 1; i < 3; i++) box(g, MATTE_BLACK, 0.003, console - 0.14, 0.003, -w / 2 + (i * w) / 3, 0.11, -d / 2 - 0.001)
+    soft(g, MATTE_BLACK, 0.9, 0.06, 0.09, 0.025, 0, console, -d / 2 + 0.1)
     const screenW = Math.min(1.22, w * 0.85)
     const screenH = (screenW * 9) / 16
-    box(g, BLACK, screenW, screenH, 0.035, 0, Math.min(h - screenH, stand + 0.1), 0.06)
-    box(g, new THREE.MeshStandardMaterial({ color: '#0b0d12', roughness: 0.08, metalness: 0.2 }), screenW - 0.02, screenH - 0.02, 0.002, 0, Math.min(h - screenH, stand + 0.1) + 0.01, 0.04)
+    const bottom = Math.min(h - screenH, console + 0.1)
+    for (const x of [-screenW * 0.35, screenW * 0.35]) box(g, MATTE_BLACK, 0.04, 0.09, 0.16, x, console, 0.04)
+    box(g, MATTE_BLACK, screenW, screenH, 0.03, 0, bottom, 0.06)
+    box(g, SCREEN, screenW - 0.012, screenH - 0.012, 0.002, 0, bottom + 0.006, 0.044)
     return g
   },
   'wardrobe/double': ([w, d, h]) => {
+    // Oak veneer doors on a recessed plinth, with slim black pulls.
     const g = new THREE.Group()
-    box(g, WHITE, w, h, d)
-    box(g, mat('#d8d4cc', 0.5), 0.005, h - 0.1, 0.005, 0, 0.05, -d / 2 - 0.003)
-    box(g, METAL, 0.02, 0.25, 0.02, -0.06, h * 0.5, -d / 2 - 0.015)
-    box(g, METAL, 0.02, 0.25, 0.02, 0.06, h * 0.5, -d / 2 - 0.015)
+    box(g, MATTE_BLACK, w - 0.04, 0.06, d - 0.04)
+    box(g, WOOD, w, h - 0.06, d, 0, 0.06)
+    box(g, MATTE_BLACK, 0.003, h - 0.1, 0.003, 0, 0.08, -d / 2 - 0.001)
+    for (const x of [-0.03, 0.03]) box(g, MATTE_BLACK, 0.012, 0.4, 0.025, x, h * 0.45, -d / 2 - 0.012)
     return g
   },
   'bath/toilet': ([w, d, h]) => {
@@ -276,40 +321,51 @@ function person([, , h]: [number, number, number]): THREE.Group {
 }
 
 function bed([w, d, h]: [number, number, number]): THREE.Group {
+  // An oak frame, a soft mattress, a duvet that falls over the sides and
+  // folds back at the top, two pillows, and an upholstered headboard.
   const g = new THREE.Group()
-  box(g, WOOD, w, 0.3, d)
-  box(g, LINEN, w - 0.06, 0.22, d - 0.1, 0, 0.3, 0.02)
-  box(g, DUVET, w - 0.04, 0.05, d * 0.6, 0, 0.52, -d * 0.18)
-  box(g, WOOD, w, h, 0.06, 0, 0, d / 2 - 0.03)
+  box(g, WOOD, w, 0.26, d, 0, 0.04)
+  for (const x of [-w / 2 + 0.06, w / 2 - 0.06]) for (const z of [-d / 2 + 0.06, d / 2 - 0.12]) box(g, WOOD, 0.05, 0.04, 0.05, x, 0, z)
+  soft(g, LINEN, w - 0.06, 0.22, d - 0.14, 0.06, 0, 0.3, 0.03)
+  const cover = d * 0.66
+  const coverZ = -d / 2 + cover / 2 + 0.02
+  soft(g, DUVET, w + 0.04, 0.07, cover, 0.035, 0, 0.47, coverZ)
+  for (const x of [-(w / 2 + 0.01), w / 2 + 0.01]) soft(g, DUVET, 0.035, 0.24, cover, 0.016, x, 0.27, coverZ)
+  soft(g, DUVET, w + 0.04, 0.24, 0.035, 0.016, 0, 0.27, -d / 2 + 0.03)
+  soft(g, DUVET, w + 0.04, 0.1, 0.24, 0.05, 0, 0.47, coverZ + cover / 2 - 0.1)
   const pillows = w > 1.2 ? [-w / 4, w / 4] : [0]
-  for (const x of pillows) box(g, WHITE, Math.min(0.6, w / pillows.length - 0.1), 0.12, 0.38, x, 0.52, d / 2 - 0.3)
+  for (const x of pillows) soft(g, PILLOW, Math.min(0.62, w / pillows.length - 0.08), 0.15, 0.42, 0.07, x, 0.5, d / 2 - 0.33)
+  soft(g, HEADBOARD, w + 0.08, h - 0.08, 0.09, 0.035, 0, 0.08, d / 2 - 0.045)
   return g
 }
 
 function counter([w, d, h]: [number, number, number]): THREE.Group {
   const g = new THREE.Group()
   const plinth = 0.1
-  box(g, mat('#2e2f33', 0.8), w - 0.04, plinth, d - 0.08, 0, 0, 0.04)
-  box(g, mat('#e9e6df', 0.5), w, h - 0.04 - plinth, d - 0.02, 0, plinth, 0.01)
-  const worktop = mat('#3c3f44', 0.3)
-  box(g, worktop, w + 0.02, 0.04, d, 0, h - 0.04)
+  box(g, MATTE_BLACK, w - 0.04, plinth, d - 0.08, 0, 0, 0.04)
+  box(g, FRONTS, w, h - 0.04 - plinth, d - 0.02, 0, plinth, 0.01)
+  box(g, WORKTOP, w + 0.02, 0.04, d, 0, h - 0.04)
   const doors = Math.max(1, Math.round(w / 0.6))
-  for (let i = 1; i < doors; i++) box(g, mat('#c9c5bc', 0.5), 0.004, h - 0.18 - plinth, 0.004, -w / 2 + (i * w) / doors, plinth + 0.04, -d / 2 + 0.01)
-  for (let i = 0; i < doors; i++) box(g, METAL, 0.12, 0.012, 0.02, -w / 2 + ((i + 0.5) * w) / doors, h - 0.16, -d / 2 - 0.005)
+  for (let i = 1; i < doors; i++) box(g, mat('#cfcbc3', 0.5), 0.003, h - 0.18 - plinth, 0.003, -w / 2 + (i * w) / doors, plinth + 0.04, -d / 2 + 0.01)
+  for (let i = 0; i < doors; i++) box(g, STEEL, 0.14, 0.012, 0.02, -w / 2 + ((i + 0.5) * w) / doors, h - 0.16, -d / 2 - 0.006)
   if (w >= 1.2 && d < 0.8) {
-    // A sink on the left third, a hob on the right, tiles behind.
-    box(g, mat('#b9bcc0', 0.25, 0.8), 0.5, 0.005, 0.4, -w / 4, h, -0.02)
-    box(g, mat('#8d9094', 0.3, 0.8), 0.44, 0.006, 0.34, -w / 4, h + 0.001, -0.02)
-    cylinder(g, METAL, 0.012, 0.012, 0.25, -w / 4, h, d / 2 - 0.08)
-    box(g, METAL, 0.02, 0.02, 0.16, -w / 4, h + 0.23, d / 2 - 0.15)
-    box(g, mat('#111214', 0.1), 0.58, 0.006, 0.5, w / 4, h, -0.02)
+    // A stainless sink on the left, a hob over an oven on the right, and
+    // a tiled splashback behind.
+    box(g, STEEL, 0.52, 0.006, 0.42, -w / 4, h, -0.02)
+    box(g, mat('#9da1a6', 0.35, 0.85), 0.46, 0.004, 0.36, -w / 4, h + 0.004, -0.02)
+    cylinder(g, STEEL, 0.013, 0.013, 0.28, -w / 4, h, d / 2 - 0.08)
+    box(g, STEEL, 0.022, 0.022, 0.18, -w / 4, h + 0.26, d / 2 - 0.16)
+    box(g, OVEN_GLASS, 0.58, 0.006, 0.5, w / 4, h, -0.02)
     for (const [x, z] of [[-0.14, -0.12], [0.14, -0.12], [-0.14, 0.1], [0.14, 0.1]]) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.004, 6, 32), mat('#3a3d42', 0.4))
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.003, 6, 40), mat('#55595f', 0.4))
       ring.rotation.x = -Math.PI / 2
       ring.position.set(w / 4 + x, h + 0.008, -0.02 + z)
       g.add(ring)
     }
-    box(g, mat('#e6e2da', 0.3), w, 0.55, 0.012, 0, h, d / 2 - 0.006)
+    box(g, MATTE_BLACK, 0.58, 0.6, 0.006, w / 4, plinth + 0.06, -d / 2 - 0.004)
+    box(g, OVEN_GLASS, 0.46, 0.34, 0.004, w / 4, plinth + 0.14, -d / 2 - 0.008)
+    box(g, STEEL, 0.44, 0.02, 0.03, w / 4, plinth + 0.56, -d / 2 - 0.03)
+    box(g, mat('#e9e6df', 0.25), w, 0.55, 0.012, 0, h, d / 2 - 0.006)
   }
   return g
 }

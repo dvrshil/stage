@@ -8,7 +8,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { findAsset } from '../core/assets.ts'
 import { check, type Problem } from '../core/check.ts'
-import { alongWall, centroid, distanceToSegment, pointInPolygon, sceneBounds, wallPieces, walls, type Point } from '../core/geometry.ts'
+import { centroid, pointInPolygon, sceneBounds, type Point } from '../core/geometry.ts'
+import { obstacles, resolve as resolveWalk, type Obstacles } from '../core/walk.ts'
 import { SKY } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { applyCutaway, buildScene, toWorld, type Built } from './build.ts'
@@ -33,7 +34,6 @@ const EYE = 1.6
 const WALK_FOV = 58
 const WALK_SPEED = 1.4
 const RUN_SPEED = 3
-const BODY_RADIUS = 0.22
 
 const canvas = $('view') as HTMLCanvasElement
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: headless })
@@ -186,19 +186,31 @@ function fitPlan() {
 // the dollhouse cutaway from above.
 function applyView(next: View, label: string) {
   view = next
-  if (built) {
-    built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
-    for (const object of built.indoor) object.visible = view === 'camera' || view === 'walk'
-  }
-  // Outdoors the sky fills the overviews; inside, the windows and room
-  // lights do the work, and sky light that would leak through walls is cut.
-  const inside = view === 'camera' || view === 'walk'
-  hemisphere.intensity = skyImage ? (inside ? 0.5 : 0.45) : inside ? 0.55 : 0.9
-  world.environmentIntensity = skyImage ? (inside ? 0.55 : 0.85) : 0.18
+  if (built) built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
+  inside = undefined
   $('camera').textContent = label
   for (const button of document.querySelectorAll<HTMLButtonElement>('#toolbar button')) {
     button.classList.toggle('active', button.dataset.camera === label.replace(/^.*: /, ''))
   }
+}
+
+// Whether the camera stands inside a room, below its ceiling: that, not the
+// chosen view, decides ceilings, room lights, and how much sky light there
+// is, so orbiting up out of a room or out through a window just works.
+let inside: boolean | undefined
+function updateInside() {
+  if (!built || !scene) return
+  const p = perspective.position
+  const room = active === perspective ? scene.rooms.find((r) => pointInPolygon([p.x, -p.z], r.floor)) : undefined
+  const level = room && scene.levels.find((l) => l.id === room.level)
+  const now = !!room && p.y < (level?.elevation ?? 0) + (room.height ?? level?.height ?? 2.7) - 0.02
+  if (now === inside) return
+  inside = now
+  for (const object of built.indoor) object.visible = now
+  // Outside, the sky fills the house; inside, windows and room lights do
+  // the work, and sky light that would leak through the walls is cut.
+  hemisphere.intensity = skyImage ? (now ? 0.5 : 0.45) : now ? 0.55 : 0.9
+  world.environmentIntensity = skyImage ? (now ? 0.55 : 0.85) : 0.18
 }
 
 // The overview: from the southwest, high enough to see into every room.
@@ -243,55 +255,11 @@ function useCamera(id: string) {
 
 // ---- Walking --------------------------------------------------------------
 
-interface Wall2D { a: Point; b: Point; half: number }
-interface Solid { x: number; y: number; halfW: number; halfD: number; angle: number }
-let blockers: Wall2D[] = []
-let solids: Solid[] = []
-
-function computeObstacles(s: Scene) {
-  blockers = []
-  for (const wall of walls(s)) {
-    // Anything solid below waist height stops you; a lintel over a door does not.
-    for (const piece of wallPieces(wall)) {
-      if (piece.bottom < 1) blockers.push({ a: alongWall(wall, piece.from), b: alongWall(wall, piece.to), half: wall.thickness / 2 })
-    }
-  }
-  solids = []
-  for (const item of s.items) {
-    if (item.asset === 'rug/area' || item.asset === 'kitchen/wall-cabinets') continue
-    const size = findAsset(item.asset)?.size ?? item.size
-    if (!size) continue
-    solids.push({ x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2, halfD: (size[1] * item.scale) / 2, angle: THREE.MathUtils.degToRad(item.facing) })
-  }
-}
-
-function blocked([x, y]: Point): boolean {
-  for (const w of blockers) if (distanceToSegment([x, y], w.a, w.b) < w.half + BODY_RADIUS) return true
-  for (const s of solids) {
-    // Into the item's own frame: facing turns it clockwise from north.
-    const dx = x - s.x
-    const dy = y - s.y
-    const lx = dx * Math.cos(s.angle) - dy * Math.sin(s.angle)
-    const ly = dx * Math.sin(s.angle) + dy * Math.cos(s.angle)
-    if (Math.abs(lx) < s.halfW + 0.12 && Math.abs(ly) < s.halfD + 0.12) return true
-  }
-  return false
-}
+let blocking: Obstacles = { walls: [], solids: [] }
+const resolve = (p: Point) => resolveWalk(p, blocking)
 
 function insideAnyRoom(p: Point): boolean {
   return !!scene?.rooms.some((room) => pointInPolygon(p, room.floor))
-}
-
-// The nearest free spot to `p`, searching outward in rings.
-function freeSpot(p: Point): Point {
-  if (!blocked(p)) return p
-  for (let r = 0.2; r < 3; r += 0.2) {
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-      const q: Point = [p[0] + r * Math.cos(a), p[1] + r * Math.sin(a)]
-      if (!blocked(q) && insideAnyRoom(q)) return q
-    }
-  }
-  return p
 }
 
 function startWalk() {
@@ -300,45 +268,50 @@ function startWalk() {
   orbit.enabled = false
   perspective.fov = WALK_FOV
   perspective.updateProjectionMatrix()
+  velocity.set(0, 0)
   let at: Point = [perspective.position.x, -perspective.position.z]
   // From an overview, step in at the first eye-level camera, or the middle
   // of the first room.
   if (view === 'orbit' || view === 'plan' || view === 'focus' || !insideAnyRoom(at)) {
     const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
     at = camera?.at ? [camera.at[0], camera.at[1]] : centroid(scene.rooms[0].floor)
-    perspective.position.copy(toWorld(freeSpot(at), EYE))
+    perspective.position.copy(toWorld(resolve(at), EYE))
     if (camera?.look) perspective.lookAt(toWorld([camera.look[0], camera.look[1]], EYE))
   } else {
-    perspective.position.copy(toWorld(freeSpot(at), EYE))
+    perspective.position.copy(toWorld(resolve(at), EYE))
   }
   applyView('walk', 'camera: walk')
   look.lock()
 }
 
 const keys = new Set<string>()
+// Meters per second in plan; it eases toward what the keys ask for, so
+// starting and stopping feel like a person, not a switch.
+const velocity = new THREE.Vector2()
 function walkStep(delta: number) {
-  const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN_SPEED : WALK_SPEED) * delta
+  const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN_SPEED : WALK_SPEED
   const direction = perspective.getWorldDirection(new THREE.Vector3())
-  const forward: Point = [direction.x, -direction.z]
-  const length = Math.hypot(forward[0], forward[1]) || 1
-  forward[0] /= length
-  forward[1] /= length
-  const right: Point = [forward[1], -forward[0]]
+  const forward = new THREE.Vector2(direction.x, -direction.z).normalize()
+  const right = new THREE.Vector2(forward.y, -forward.x)
   let f = 0
   let r = 0
   if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1
   if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1
   if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1
   if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1
-  if (f === 0 && r === 0) return
-  const norm = Math.hypot(f, r)
-  const dx = ((forward[0] * f + right[0] * r) / norm) * speed
-  const dy = ((forward[1] * f + right[1] * r) / norm) * speed
+  const wanted = forward.multiplyScalar(f).add(right.multiplyScalar(r))
+  if (wanted.lengthSq() > 0) wanted.setLength(speed)
+  velocity.lerp(wanted, 1 - Math.exp(-delta * 10))
+  if (velocity.lengthSq() < 1e-5) {
+    velocity.set(0, 0)
+    return
+  }
   const here: Point = [perspective.position.x, -perspective.position.z]
-  // Slide along whatever stops you instead of sticking to it.
-  const candidates: Point[] = [[here[0] + dx, here[1] + dy], [here[0] + dx, here[1]], [here[0], here[1] + dy]]
-  const next = candidates.find((p) => !blocked(p))
-  if (next) perspective.position.set(next[0], EYE, -next[1])
+  const next = resolve([here[0] + velocity.x * delta, here[1] + velocity.y * delta])
+  // What the walls took away is gone from the velocity too, so pressing
+  // into a wall doesn't build up speed that jerks you along when it ends.
+  velocity.set((next[0] - here[0]) / delta, (next[1] - here[1]) / delta)
+  perspective.position.set(next[0], EYE, -next[1])
 }
 
 window.addEventListener('keydown', (event) => {
@@ -520,7 +493,7 @@ async function load(first: boolean): Promise<void> {
   scene = next
   built = buildScene(next)
   world.add(built.root)
-  computeObstacles(next)
+  blocking = obstacles(next)
   alignSky()
   if (built.sun) {
     const b = sceneBounds(next)
@@ -623,6 +596,8 @@ function listen() {
 }
 
 const clock = new THREE.Clock()
+const lastView = new THREE.Matrix4()
+let stillSince = 0
 function frame() {
   const delta = Math.min(clock.getDelta(), 0.1)
   if (look.isLocked) walkStep(delta)
@@ -637,15 +612,25 @@ function frame() {
       h.helper.update()
     }
   }
-  if (built) applyCutaway(built.root, active, view === 'orbit' || view === 'focus')
-  if (quality === 'high' && active === perspective) {
+  updateInside()
+  if (built) applyCutaway(built.root, active, !inside, active === perspective)
+  // Ambient occlusion only once the view holds still: moving stays smooth,
+  // and the finished picture fills in a fifth of a second after you stop.
+  perspective.updateMatrixWorld()
+  if (!lastView.equals(perspective.matrixWorld)) {
+    lastView.copy(perspective.matrixWorld)
+    stillSince = now
+  }
+  const still = headless || now - stillSince > 200
+  if (quality === 'high' && active === perspective && still) {
     renderPass.camera = perspective
     ao.camera = perspective
     composer.render(delta)
   } else {
     renderer.render(world, active)
   }
-  if (!headless && quality === 'high') {
+  // Slow even without ambient occlusion: draw fewer pixels.
+  if (!headless && quality === 'high' && !still) {
     slowFrames = delta > 0.05 ? slowFrames + 1 : Math.max(0, slowFrames - 2)
     if (slowFrames > 90) setQuality('fast', 'Switched to fast rendering because this machine draws slowly. Press Q for high quality.')
   }

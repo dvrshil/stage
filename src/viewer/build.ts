@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { alongWall, area, centroid, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
+import { alongWall, area, centroid, distanceToSegment, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
 import { FIXTURES } from '../core/assets.ts'
 import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
@@ -246,7 +246,9 @@ function buildWall(wall: Wall, rooms: Map<string, Scene['rooms'][number]>): THRE
   const right = paint(rightRoom)
   // For the dollhouse cutaway: the side with no room is outside. In world
   // space the plan's left normal (-dy, dx) becomes (-dy, 0, -dx).
-  const outward = wall.exterior ? (leftRoom ? new THREE.Vector3(normal[0], 0, -normal[1]).negate() : new THREE.Vector3(normal[0], 0, -normal[1])) : undefined
+  // The side with no room is outside; the plan's left normal is `normal`.
+  const outward: Point | undefined = wall.exterior ? (leftRoom ? [-normal[0], -normal[1]] : [normal[0], normal[1]]) : undefined
+  group.userData.wall = { a: wall.a, b: wall.b, half: wall.thickness / 2, base: wall.elevation, height: wall.height, outward } satisfies WallInfo
 
   for (const piece of wallPieces(wall)) {
     // Pieces at either end of the wall reach half a thickness past it, so
@@ -265,7 +267,7 @@ function buildWall(wall: Wall, rooms: Map<string, Scene['rooms'][number]>): THRE
     mesh.rotation.y = angle
     mesh.castShadow = true
     mesh.receiveShadow = true
-    if (outward) mesh.userData.cutaway = { outward, bottom: piece.bottom, top: piece.top, base: wall.elevation }
+    mesh.userData.cutaway = { bottom: piece.bottom, top: piece.top, base: wall.elevation }
     group.add(mesh)
 
     if (piece.bottom === 0 && piece.to - piece.from > 0.02) {
@@ -286,31 +288,70 @@ function buildWall(wall: Wall, rooms: Map<string, Scene['rooms'][number]>): THRE
   return group
 }
 
-// The height exterior walls drop to when they face the camera.
+// The height exterior walls drop to when they face the camera from outside.
 export const CUTAWAY_HEIGHT = 0.9
 
-// Lowers the outside walls between the camera and the rooms, the way a
-// dollhouse opens, so an overview shows every room. Off for plan and eye-level views.
-export function applyCutaway(root: THREE.Object3D, camera: THREE.Camera, enabled: boolean) {
-  const toCamera = new THREE.Vector3()
-  root.traverse((object) => {
-    const cut = object.userData.cutaway as { outward: THREE.Vector3; bottom: number; top: number; base: number } | undefined
-    if (!cut || !(object instanceof THREE.Mesh)) return
-    toCamera.subVectors(camera.position, object.position).setY(0).normalize()
-    const facing = enabled && cut.outward.dot(toCamera) > 0.15
-    const top = facing ? Math.min(cut.top, CUTAWAY_HEIGHT) : cut.top
-    const height = top - cut.bottom
-    object.visible = height > 0.01
-    if (!object.visible) return
-    object.scale.y = height / (cut.top - cut.bottom)
-    object.position.y = cut.base + cut.bottom + height / 2
-  })
+interface WallInfo {
+  a: Point
+  b: Point
+  half: number
+  base: number
+  height: number
+  outward?: Point
+}
+
+// Gets walls out of the camera's way, by where the camera is rather than
+// which view is chosen:
+// - a camera inside a wall, or touching it, hides that wall, so nothing is
+//   ever seen sliced open;
+// - from outside, an exterior wall facing the camera within 1.5 m is
+//   hidden, so you look straight into the room;
+// - from farther outside, walls facing the camera drop to waist height,
+//   the way a dollhouse opens, and the rest of the house stays standing.
+// Openings and trim go with their wall. Walking never triggers the first
+// two: a person keeps 20 cm from every wall face.
+export function applyCutaway(root: THREE.Object3D, camera: THREE.Camera, outside: boolean, enabled: boolean) {
+  const eye: Point = [camera.position.x, -camera.position.z]
+  for (const group of root.children) {
+    const w = group.userData.wall as WallInfo | undefined
+    if (!w) continue
+    let mode: 'full' | 'cut' | 'hidden' = 'full'
+    if (enabled) {
+      const level = camera.position.y > w.base - 0.3 && camera.position.y < w.base + w.height + 0.3
+      const gap = distanceToSegment(eye, w.a, w.b) - w.half
+      if (gap < 0.15 && level) mode = 'hidden'
+      else if (outside && w.outward) {
+        const mid = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2]
+        const dx = eye[0] - mid[0]
+        const dy = eye[1] - mid[1]
+        const facing = (w.outward[0] * dx + w.outward[1] * dy) / (Math.hypot(dx, dy) || 1) > 0.15
+        if (facing) mode = gap < 1.5 && level ? 'hidden' : 'cut'
+      }
+    }
+    group.visible = mode !== 'hidden'
+    if (mode === 'hidden') continue
+    for (const child of group.children) {
+      const cut = child.userData.cutaway as { bottom: number; top: number; base: number } | undefined
+      if (child.userData.opening) {
+        child.visible = mode === 'full'
+        continue
+      }
+      if (!cut) continue
+      const top = mode === 'cut' ? Math.min(cut.top, CUTAWAY_HEIGHT) : cut.top
+      const height = top - cut.bottom
+      child.visible = height > 0.01
+      if (!child.visible) continue
+      child.scale.y = height / (cut.top - cut.bottom)
+      child.position.y = cut.base + cut.bottom + height / 2
+    }
+  }
 }
 
 function buildOpening(wall: Wall, hole: Wall['openings'][number]): THREE.Object3D | undefined {
   const { opening } = hole
   const group = new THREE.Group()
   group.name = opening.id
+  group.userData.opening = true
   const width = hole.to - hole.from
   const center = alongWall(wall, (hole.from + hole.to) / 2)
   group.position.copy(toWorld(center, wall.elevation + hole.bottom))

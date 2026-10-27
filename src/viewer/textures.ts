@@ -158,10 +158,28 @@ export function boxInMeters(width: number, height: number, depth: number): THREE
 }
 
 // A cylinder whose side UVs run in meters around and up it.
-export function cylinderInMeters(radiusTop: number, radiusBottom: number, height: number, segments = 24): THREE.CylinderGeometry {
-  const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments)
+export function cylinderInMeters(radiusTop: number, radiusBottom: number, height: number, segments = 24, open = false): THREE.CylinderGeometry {
+  const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments, 1, open)
   const uv = geometry.attributes.uv
   const around = Math.PI * (radiusTop + radiusBottom)
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * around, uv.getY(i) * height)
+  return geometry
+}
+
+// UVs in meters for any shape, projected along each vertex's dominant
+// normal, so a texture keeps its real size on rounded and odd shapes.
+export function projectInMeters<T extends THREE.BufferGeometry>(geometry: T): T {
+  const position = geometry.attributes.position
+  const normal = geometry.attributes.normal
+  const uv = new Float32Array(position.count * 2)
+  for (let i = 0; i < position.count; i++) {
+    const nx = Math.abs(normal.getX(i))
+    const ny = Math.abs(normal.getY(i))
+    const nz = Math.abs(normal.getZ(i))
+    const [u, v] = nx >= ny && nx >= nz ? [position.getZ(i), position.getY(i)] : ny >= nz ? [position.getX(i), position.getZ(i)] : [position.getX(i), position.getY(i)]
+    uv[i * 2] = u
+    uv[i * 2 + 1] = v
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
   return geometry
 }
