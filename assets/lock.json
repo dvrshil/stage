@@ -1364,6 +1364,62 @@
         4.56,
         2.07
       ]
+    },
+    "island_tree_02": {
+      "source": "https://polyhaven.com/a/island_tree_02",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/island_tree_02/1k/island_tree_02.gltf",
+        "md5": "825057164e987894cbfc6c462977fa71"
+      },
+      "files": [
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_nor_gl_1k.jpg",
+          "md5": "d8b8bc86de9934a743fc9b0a5470e695"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_diff_1k.jpg",
+          "md5": "b7435527d9628527ce47d89fc1468e9a"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_arm_1k.jpg",
+          "md5": "e487f91bcb37a2a1109ef6234f1db27e"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_leaves_nor_gl_1k.jpg",
+          "md5": "a08ffb98b5ffb7dfa682e05a1639c642"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_leaves_diff_1k.jpg",
+          "md5": "1356cbb5a5dd1318f9f2a01eddbf03e1"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_leaves_arm_1k.jpg",
+          "md5": "27b06c4a53ff115ed7d51ee94e417257"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_branches_nor_gl_1k.jpg",
+          "md5": "789084affb01f4a22290a848558f5e12"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_branches_diff_1k.jpg",
+          "md5": "7792907fe2b2b748c129a2384192a579"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/textures/island_tree_02_branches_arm_1k.jpg",
+          "md5": "5b6f5b3838f4a8f60fea14fa3a3fef9f"
+        },
+        {
+          "file": "polyhaven/island_tree_02/1k/island_tree_02.bin",
+          "md5": "7fa9d6ee752b670cabb65053a5c6395b"
+        }
+      ],
+      "size": [
+        4.21,
+        4.07,
+        3.41
+      ]
     }
   }
 }

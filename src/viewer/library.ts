@@ -131,9 +131,14 @@ export function loadModel(id: string): Promise<THREE.Object3D | undefined> {
       .loadAsync(`./library/${entry.gltf.file}`)
       .then((gltf) => {
         gltf.scene.traverse((object) => {
-          if (object instanceof THREE.Mesh) {
-            object.castShadow = true
-            object.receiveShadow = true
+          if (!(object instanceof THREE.Mesh)) return
+          object.castShadow = true
+          object.receiveShadow = true
+          // Leaves are cut from cards by their alpha; their shadows must be
+          // cut the same way, or a tree shades the lawn with black slabs.
+          const material = (Array.isArray(object.material) ? object.material[0] : object.material) as THREE.MeshStandardMaterial
+          if (material?.map && (material.alphaTest > 0 || material.transparent)) {
+            object.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: material.map, alphaTest: material.alphaTest || 0.5 })
           }
         })
         return gltf.scene as THREE.Object3D
