@@ -65,6 +65,8 @@ class Devtools {
 
 export interface RenderOptions {
   camera?: string
+  // 'fast' skips ambient occlusion; 'high' is the default.
+  quality?: 'high' | 'fast'
   width?: number
   height?: number
   timeout?: number
@@ -146,19 +148,20 @@ export class Renderer {
     await this.devtools.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId)
     const extra: Record<string, string> = { headless: '1', w: String(width), h: String(height) }
     if (options.camera) extra.camera = options.camera
+    if (options.quality) extra.quality = options.quality
     await this.devtools.send('Page.navigate', { url: viewerUrl(this.server.url, scene, extra) }, this.sessionId)
 
     const deadline = Date.now() + (options.timeout ?? 30000)
     for (;;) {
       const { result } = await this.devtools.send(
         'Runtime.evaluate',
-        { expression: 'document.body ? [document.body.dataset.ready || "", document.body.dataset.error || ""] : ["", ""]', returnByValue: true },
+        { expression: 'document.body ? [document.body.dataset.ready || "", document.body.dataset.error || "", document.body.dataset.phase || ""] : ["", "", ""]', returnByValue: true },
         this.sessionId,
       )
-      const [ready, error] = (result?.value ?? ['', '']) as [string, string]
+      const [ready, error, phase] = (result?.value ?? ['', '', '']) as [string, string, string]
       if (ready === '1') break
       if (ready === 'error') throw new Error(error || 'the viewer could not build the scene')
-      if (Date.now() > deadline) throw new Error(`the render timed out${this.errors.length ? `: ${this.errors.join('; ')}` : ''}`)
+      if (Date.now() > deadline) throw new Error(`the render timed out${phase ? ` while loading ${phase}` : ''}${this.errors.length ? `: ${this.errors.join('; ')}` : ''}`)
       await new Promise((resolve) => setTimeout(resolve, 80))
     }
     const { data } = await this.devtools.send('Page.captureScreenshot', { format: 'png' }, this.sessionId)

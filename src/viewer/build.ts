@@ -3,6 +3,7 @@ import { alongWall, area, centroid, roomElevation, roomHeight, wallAngle, wallPi
 import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { buildItem, textSprite } from './furniture.ts'
+import { textureSet } from './library.ts'
 import { planks, speckle, tiles } from './textures.ts'
 
 // Plan coordinates [x, y] (y north) become three.js [x, -z] with y up, so
@@ -17,32 +18,79 @@ const DOOR = new THREE.MeshStandardMaterial({ color: '#b08a62', roughness: 0.6 }
 const TRIM = new THREE.MeshStandardMaterial({ color: '#f3f1ec', roughness: 0.45 })
 const FIXTURE = new THREE.MeshStandardMaterial({ color: '#fffaf0', emissive: '#fff1d6', emissiveIntensity: 2.2, roughness: 0.4 })
 
+// A photographed texture set, when downloaded. Every surface carries UVs
+// in meters, so it lands at the size Poly Haven measured.
+function photographed(spec: (typeof MATERIALS)[string]): THREE.MeshStandardMaterial | undefined {
+  const set = textureSet(spec.texture)
+  if (!set) return undefined
+  return new THREE.MeshStandardMaterial({
+    // Paint keeps its own color: only the plaster's relief and sheen show
+    // through, the way paint on a real wall looks.
+    color: spec.tint ? spec.color : '#ffffff',
+    map: spec.tint ? null : set.color,
+    normalMap: set.normal,
+    // Poly Haven's "arm" packs ambient occlusion, roughness, and metalness
+    // in red, green, and blue: the channels three.js reads for each.
+    aoMap: set.arm,
+    aoMapIntensity: spec.tint ? 0.4 : 0.8,
+    roughnessMap: set.arm,
+    roughness: 1,
+    metalness: 0,
+  })
+}
+
 const materialCache = new Map<string, THREE.MeshStandardMaterial>()
 function material(name: string | undefined, fallback: string): THREE.MeshStandardMaterial {
   const key = name && MATERIALS[name] ? name : fallback
   let m = materialCache.get(key)
   if (!m) {
     const spec = MATERIALS[key]
-    m = new THREE.MeshStandardMaterial({ color: spec.color, roughness: spec.roughness, metalness: spec.metalness ?? 0 })
+    m = photographed(spec) ?? new THREE.MeshStandardMaterial({ color: spec.color, roughness: spec.roughness, metalness: spec.metalness ?? 0 })
     materialCache.set(key, m)
   }
   return m
 }
 
-// Floors carry UVs in meters, so a pattern repeats at its real size.
+// Floors: the photographed set, or a pattern drawn at its real size.
 const floorCache = new Map<string, THREE.MeshStandardMaterial>()
 function floorMaterial(name: string | undefined): THREE.MeshStandardMaterial {
   const key = name && MATERIALS[name] ? name : DEFAULT_MATERIALS.floor
   let m = floorCache.get(key)
   if (m) return m
   const spec = MATERIALS[key]
-  m = new THREE.MeshStandardMaterial({ roughness: spec.roughness, metalness: spec.metalness ?? 0 })
-  if (spec.pattern === 'planks') m.map = planks(spec.color)
-  else if (spec.pattern === 'tiles') m.map = tiles(spec.color, spec.tile ?? 0.6)
-  else if (spec.pattern === 'speckle') m.map = speckle(spec.color, 1)
-  else m.color.set(spec.color)
+  m = photographed(spec)
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({ roughness: spec.roughness, metalness: spec.metalness ?? 0 })
+    if (spec.pattern === 'planks') m.map = planks(spec.color)
+    else if (spec.pattern === 'tiles') m.map = tiles(spec.color, spec.tile ?? 0.6)
+    else if (spec.pattern === 'speckle') m.map = speckle(spec.color, 1)
+    else m.color.set(spec.color)
+  }
   floorCache.set(key, m)
   return m
+}
+
+// A box's UVs run 0 to 1 on every face; rescale them to meters so a
+// texture repeats at its real size whatever the piece's dimensions.
+function boxInMeters(width: number, height: number, depth: number): THREE.BoxGeometry {
+  const geometry = new THREE.BoxGeometry(width, height, depth)
+  const uv = geometry.attributes.uv
+  // Faces in order: +x, -x, +y, -y, +z, -z, four vertices each.
+  const spans: [number, number][] = [[depth, height], [depth, height], [width, depth], [width, depth], [width, height], [width, height]]
+  for (let face = 0; face < 6; face++) {
+    for (let v = 0; v < 4; v++) {
+      const i = face * 4 + v
+      uv.setXY(i, uv.getX(i) * spans[face][0], uv.getY(i) * spans[face][1])
+    }
+  }
+  return geometry
+}
+
+// Built scenes are cached by material name, so a rebuild after an edit
+// reuses textures already on the GPU; a new library means new materials.
+export function resetMaterials() {
+  materialCache.clear()
+  floorCache.clear()
 }
 
 export interface Built {
@@ -93,7 +141,7 @@ export function buildScene(scene: Scene): Built {
     fixture.position.copy(toWorld([lx, ly], elevation + height - 0.02))
     group.add(fixture)
     indoor.push(fixture)
-    const lamp = new THREE.PointLight('#ffe6c4', 3.2 * Math.sqrt(Math.max(4, area(room.floor))), 0, 2)
+    const lamp = new THREE.PointLight('#ffe6c4', 5 * Math.sqrt(Math.max(4, area(room.floor))), 0, 2)
     lamp.position.copy(toWorld([lx, ly], elevation + height - 0.35))
     group.add(lamp)
     indoor.push(lamp)
@@ -194,7 +242,7 @@ function buildWall(wall: Wall, rooms: Map<string, Scene['rooms'][number]>): THRE
     // Local box axes: x along the wall, y up, z across it. In world space
     // local +z points to the plan's right side of a -> b.
     const faces = [EXTERIOR, EXTERIOR, EXTERIOR, EXTERIOR, right, left]
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(length, height, wall.thickness), faces)
+    const mesh = new THREE.Mesh(boxInMeters(length, height, wall.thickness), faces)
     const center = alongWall(wall, (piece.from - extendStart + piece.to + extendEnd) / 2)
     mesh.position.copy(toWorld(center, wall.elevation + piece.bottom + height / 2))
     mesh.rotation.y = angle

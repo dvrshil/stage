@@ -2,11 +2,17 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { findAsset } from '../core/assets.ts'
 import { check, type Problem } from '../core/check.ts'
 import { alongWall, centroid, distanceToSegment, pointInPolygon, sceneBounds, wallPieces, walls, type Point } from '../core/geometry.ts'
+import { SKY } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { applyCutaway, buildScene, toWorld, type Built } from './build.ts'
+import { loadLibrary, loadSky, settled, type Sky } from './library.ts'
 import { speckle } from './textures.ts'
 
 // The viewer. The same page serves a person in a browser and the command
@@ -33,7 +39,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDraw
 renderer.setPixelRatio(headless ? 1 : Math.min(window.devicePixelRatio, 2))
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
-renderer.toneMappingExposure = 1.0
+renderer.toneMappingExposure = 1.1
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
@@ -44,7 +50,9 @@ world.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
 world.environmentIntensity = 0.18
 const hemisphere = new THREE.HemisphereLight('#e3ecf7', '#8d8270', 0.9)
 world.add(hemisphere)
-world.add(sky())
+// A drawn gradient until the photographed sky loads.
+const dome = sky()
+world.add(dome)
 world.add(lawn())
 
 function sky(): THREE.Mesh {
@@ -86,6 +94,51 @@ orbit.enableDamping = !headless
 orbit.maxPolarAngle = Math.PI * 0.495
 const look = new PointerLockControls(perspective, document.body)
 
+// Ambient occlusion: the darkening where walls meet floors and under
+// furniture, which direct light alone never gives. Perspective views only.
+const composer = new EffectComposer(renderer)
+const renderPass = new RenderPass(world, perspective)
+const ao = new GTAOPass(world, perspective, 1280, 720)
+ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 2, thickness: 0.6, scale: 1, samples: 16 })
+ao.blendIntensity = 0.85
+composer.addPass(renderPass)
+composer.addPass(ao)
+composer.addPass(new OutputPass())
+
+// High quality until frames get slow (a machine without a GPU), then fast:
+// no ambient occlusion, one pixel per pixel. Q switches by hand.
+let quality: 'high' | 'fast' = params.get('quality') === 'fast' ? 'fast' : 'high'
+let slowFrames = 0
+function setQuality(next: 'high' | 'fast', why: string) {
+  quality = next
+  slowFrames = 0
+  renderer.setPixelRatio(headless || next === 'fast' ? 1 : Math.min(window.devicePixelRatio, 2))
+  resize()
+  setStatus(why)
+}
+
+let skyImage: Sky | undefined
+async function applySky() {
+  skyImage = await loadSky(SKY)
+  if (!skyImage) return
+  world.remove(dome)
+  world.background = skyImage.texture
+  world.environment = pmrem.fromEquirectangular(skyImage.texture).texture
+  alignSky()
+  applyView(view, $('camera').textContent ?? '')
+}
+
+// Turns the photographed sky so its sun stands where the scene's sun does,
+// and the light from the sky agrees with the shadows.
+function alignSky() {
+  if (!skyImage || !scene) return
+  const sun = scene.lights.find((light) => light.type === 'sun')
+  const azimuth = THREE.MathUtils.degToRad(sun?.azimuth ?? 220)
+  const turn = skyImage.sunAngle - Math.atan2(-Math.cos(azimuth), Math.sin(azimuth))
+  world.environmentRotation.y = turn
+  world.backgroundRotation.y = turn
+}
+
 type View = 'orbit' | 'plan' | 'camera' | 'walk' | 'focus'
 let view: View = 'orbit'
 let scene: Scene | undefined
@@ -100,6 +153,8 @@ function resize() {
   const width = headless ? Number(params.get('w') ?? 1280) : window.innerWidth
   const height = headless ? Number(params.get('h') ?? 720) : window.innerHeight
   renderer.setSize(width, height, !headless)
+  composer.setPixelRatio(renderer.getPixelRatio())
+  composer.setSize(width, height)
   perspective.aspect = width / height
   perspective.updateProjectionMatrix()
   fitPlan()
@@ -134,8 +189,11 @@ function applyView(next: View, label: string) {
     built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
     for (const object of built.indoor) object.visible = view === 'camera' || view === 'walk'
   }
-  // Outdoors light fills the overviews; inside, the room lights do the work.
-  hemisphere.intensity = view === 'camera' || view === 'walk' ? 0.55 : 0.9
+  // Outdoors the sky fills the overviews; inside, the windows and room
+  // lights do the work, and sky light that would leak through walls is cut.
+  const inside = view === 'camera' || view === 'walk'
+  hemisphere.intensity = skyImage ? (inside ? 0.5 : 0.45) : inside ? 0.55 : 0.9
+  world.environmentIntensity = skyImage ? (inside ? 0.55 : 0.85) : 0.18
   $('camera').textContent = label
   for (const button of document.querySelectorAll<HTMLButtonElement>('#toolbar button')) {
     button.classList.toggle('active', button.dataset.camera === label.replace(/^.*: /, ''))
@@ -290,6 +348,7 @@ window.addEventListener('keydown', (event) => {
   else if (key === 'o') useCamera('orbit')
   else if (key === 'p') useCamera('plan')
   else if (key === 'v') startWalk()
+  else if (key === 'q') setQuality(quality === 'high' ? 'fast' : 'high', quality === 'high' ? 'Fast rendering: press Q for high quality.' : 'High quality.')
   else if (key === 'l') {
     labelsOn = !labelsOn
     applyView(view, $('camera').textContent ?? '')
@@ -461,6 +520,7 @@ async function load(first: boolean): Promise<void> {
   built = buildScene(next)
   world.add(built.root)
   computeObstacles(next)
+  alignSky()
   if (built.sun) {
     const b = sceneBounds(next)
     const size = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1]) / 2 + 3
@@ -577,14 +637,34 @@ function frame() {
     }
   }
   if (built) applyCutaway(built.root, active, view === 'orbit' || view === 'focus')
-  renderer.render(world, active)
+  if (quality === 'high' && active === perspective) {
+    renderPass.camera = perspective
+    ao.camera = perspective
+    composer.render(delta)
+  } else {
+    renderer.render(world, active)
+  }
+  if (!headless && quality === 'high') {
+    slowFrames = delta > 0.05 ? slowFrames + 1 : Math.max(0, slowFrames - 2)
+    if (slowFrames > 90) setQuality('fast', 'Switched to fast rendering because this machine draws slowly. Press Q for high quality.')
+  }
 }
 
 async function start() {
   try {
+    // Each phase is recorded, so a render that times out says where it stopped.
+    const phase = (name: string) => (document.body.dataset.phase = name)
     resize()
+    phase('library')
+    await loadLibrary()
+    phase('scene')
     await load(true)
+    phase('sky')
+    await applySky()
     if (headless) {
+      phase('textures')
+      await settled()
+      phase('frames')
       // A few frames: the first fills the shadow maps.
       frame()
       frame()

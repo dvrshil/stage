@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "textures": {
+    "plastered_wall_04": {
+      "source": "https://polyhaven.com/a/plastered_wall_04",
+      "license": "CC0",
+      "size": [
+        3.2,
+        3.2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/plastered_wall_04/1k/color.jpg",
+          "md5": "3a45e9e3ff0c6aa179371dff02bded1f"
+        },
+        "normal": {
+          "file": "polyhaven/plastered_wall_04/1k/normal.jpg",
+          "md5": "f18e649235bb688732fb0ef1d61a5286"
+        },
+        "arm": {
+          "file": "polyhaven/plastered_wall_04/1k/arm.jpg",
+          "md5": "4d3c55b7cbb32cce818af5b2a1f18ffa"
+        }
+      }
+    },
+    "laminate_floor_02": {
+      "source": "https://polyhaven.com/a/laminate_floor_02",
+      "license": "CC0",
+      "size": [
+        1.7,
+        1.7
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/laminate_floor_02/1k/color.jpg",
+          "md5": "34ab81c5882c1083028ffa71d40fe44d"
+        },
+        "normal": {
+          "file": "polyhaven/laminate_floor_02/1k/normal.jpg",
+          "md5": "40f4b1e4a5cafbd3bd1b02e8367cf3b1"
+        },
+        "arm": {
+          "file": "polyhaven/laminate_floor_02/1k/arm.jpg",
+          "md5": "9db91bd64004a9e0e3c8fedd641352ba"
+        }
+      }
+    },
+    "herringbone_parquet": {
+      "source": "https://polyhaven.com/a/herringbone_parquet",
+      "license": "CC0",
+      "size": [
+        3.4,
+        3.4
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/herringbone_parquet/1k/color.jpg",
+          "md5": "dae9d3dd6d8a2c2e387da22fd8228265"
+        },
+        "normal": {
+          "file": "polyhaven/herringbone_parquet/1k/normal.jpg",
+          "md5": "c0a64eb61ea44add715c6fe29b958adf"
+        },
+        "arm": {
+          "file": "polyhaven/herringbone_parquet/1k/arm.jpg",
+          "md5": "0c5a18f599282509ae37e2f0bcc4e492"
+        }
+      }
+    },
+    "dark_wooden_planks": {
+      "source": "https://polyhaven.com/a/dark_wooden_planks",
+      "license": "CC0",
+      "size": [
+        2,
+        2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/dark_wooden_planks/1k/color.jpg",
+          "md5": "7ec8fe3e0b84289a4add3b10a54090bb"
+        },
+        "normal": {
+          "file": "polyhaven/dark_wooden_planks/1k/normal.jpg",
+          "md5": "4093b4023a4270b3a06b762076106d58"
+        },
+        "arm": {
+          "file": "polyhaven/dark_wooden_planks/1k/arm.jpg",
+          "md5": "5e5911f2c6d4fbce78c995ec7591eaa9"
+        }
+      }
+    },
+    "granite_tile": {
+      "source": "https://polyhaven.com/a/granite_tile",
+      "license": "CC0",
+      "size": [
+        2.3,
+        2.3
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/granite_tile/1k/color.jpg",
+          "md5": "5dfd6dbdb5c0b22ca04505c6209cea9f"
+        },
+        "normal": {
+          "file": "polyhaven/granite_tile/1k/normal.jpg",
+          "md5": "e9053333e3db348d10466a781456ec58"
+        },
+        "arm": {
+          "file": "polyhaven/granite_tile/1k/arm.jpg",
+          "md5": "7c526438b1f83d77415227b81f24c964"
+        }
+      }
+    },
+    "terrazzo_tiles": {
+      "source": "https://polyhaven.com/a/terrazzo_tiles",
+      "license": "CC0",
+      "size": [
+        2,
+        2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/terrazzo_tiles/1k/color.jpg",
+          "md5": "12c27a579c2ed49de854b8a86e33647b"
+        },
+        "normal": {
+          "file": "polyhaven/terrazzo_tiles/1k/normal.jpg",
+          "md5": "a5f6d05f27db4151227535bdbc82c048"
+        },
+        "arm": {
+          "file": "polyhaven/terrazzo_tiles/1k/arm.jpg",
+          "md5": "843e281304070827482b94ed7da24bc4"
+        }
+      }
+    },
+    "concrete_floor_02": {
+      "source": "https://polyhaven.com/a/concrete_floor_02",
+      "license": "CC0",
+      "size": [
+        2,
+        2
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/concrete_floor_02/1k/color.jpg",
+          "md5": "1cfee53d2f82fa59726ab7ae6a2e8c09"
+        },
+        "normal": {
+          "file": "polyhaven/concrete_floor_02/1k/normal.jpg",
+          "md5": "c2065fd81f571f4e39163ea5661128fb"
+        },
+        "arm": {
+          "file": "polyhaven/concrete_floor_02/1k/arm.jpg",
+          "md5": "5995ee8efda4e7966a277b3d9049eb2b"
+        }
+      }
+    },
+    "marble_01": {
+      "source": "https://polyhaven.com/a/marble_01",
+      "license": "CC0",
+      "size": [
+        1.5,
+        1.5
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/marble_01/1k/color.jpg",
+          "md5": "04325ced5018eb8a2e598a4ef69cb176"
+        },
+        "normal": {
+          "file": "polyhaven/marble_01/1k/normal.jpg",
+          "md5": "fa073d722cde733c1bd6cc6e8897c8e3"
+        },
+        "arm": {
+          "file": "polyhaven/marble_01/1k/arm.jpg",
+          "md5": "51017a4e4f320c3b58763c66727d89c1"
+        }
+      }
+    }
+  },
+  "skies": {
+    "kloofendal_48d_partly_cloudy_puresky": {
+      "source": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky",
+      "license": "CC0",
+      "resolution": "2k",
+      "hdr": {
+        "file": "polyhaven/kloofendal_48d_partly_cloudy_puresky/2k/sky.hdr",
+        "md5": "2eba3a4d7eeb23cbfbeca364c97e7980"
+      }
+    }
+  }
+}

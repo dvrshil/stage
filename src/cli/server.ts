@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CACHE, availableLock } from './assets.ts'
 
 // Serves the built viewer, the scene files it asks for, and a stream of
 // changes, so the browser updates the moment an agent writes the file.
@@ -19,6 +20,9 @@ const TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.hdr': 'application/octet-stream',
+  '.glb': 'model/gltf-binary',
   '.svg': 'image/svg+xml',
 }
 
@@ -97,6 +101,16 @@ export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
     const url = new URL(request.url ?? '/', `http://${host}`)
 
     if (url.pathname === '/api/health') return send(response, 200, { stage: VERSION, pid: process.pid })
+
+    // Downloaded CC0 textures and skies, from the local cache.
+    if (url.pathname === '/api/library') return send(response, 200, await availableLock())
+    if (url.pathname.startsWith('/library/')) {
+      const file = normalize(join(CACHE, decodeURIComponent(url.pathname.slice('/library/'.length))))
+      if (!file.startsWith(CACHE) || !existsSync(file)) return send(response, 404, { error: 'not in the asset cache; run: stage assets fetch' })
+      response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'max-age=31536000, immutable' })
+      createReadStream(file).pipe(response)
+      return
+    }
 
     if (url.pathname.startsWith('/api/')) {
       const path = scenePath(url.searchParams.get('path'))

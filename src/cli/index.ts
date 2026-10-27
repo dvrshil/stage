@@ -31,6 +31,7 @@ Commands that need no display:
   remove <scene> <id>                  Remove an entity
   show <scene> [--camera id] [--focus id]  Point every open viewer at a camera or an entity
   assets [words...] [--category c]     Search the asset library
+  assets fetch [--resolution 1k]       Download the CC0 textures and sky into the local cache
   materials                            List the built-in materials
   fmt <scene>                          Rewrite the scene in canonical form
   schema                               Print the scene format as JSON Schema
@@ -73,6 +74,7 @@ async function main(argv: string[]): Promise<number> {
       from: { type: 'string' },
       category: { type: 'string' },
       port: { type: 'string' },
+      resolution: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   })
@@ -186,6 +188,12 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case 'assets': {
+      if (positionals[0] === 'fetch') {
+        const { fetchAssets, CACHE } = await import('./assets.ts')
+        const lock = await fetchAssets((values.resolution as string | undefined) ?? '1k', json ? undefined : (line) => print(line))
+        json ? print({ ok: true, cache: CACHE, textures: Object.keys(lock.textures), skies: Object.keys(lock.skies) }) : print(`Fetched into ${CACHE}`)
+        return 0
+      }
       const found = searchAssets(positionals.join(' '), { category: values.category as string | undefined })
       if (json) print(found)
       else for (const a of found) print(`${a.id.padEnd(28)} ${a.size.join(' x ')} m   ${a.name}`)
