@@ -1,33 +1,59 @@
 import * as THREE from 'three'
 import { findAsset } from '../core/assets.ts'
-import { fitModel, hasModel, loadModel } from './library.ts'
-import { contactShadow } from './textures.ts'
+import { MATERIALS } from '../core/materials.ts'
+import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
+import { boxInMeters, contactShadow, cylinderInMeters } from './textures.ts'
 
 // Furniture built from primitives, by asset id. Each builder returns a group
 // with its footprint centered on the origin, the floor at y = 0, and the
 // front of the piece toward -z (north in plan), which is facing 0.
-// Version 0.1 only; Milestone 1 swaps these for real glTF models.
+// Pieces with a CC0 model use it once downloaded; these stand in until
+// then, and remain for pieces no CC0 model covers, in photographed
+// wood, linen, and wool where the library has them.
 
 type Builder = (size: [number, number, number]) => THREE.Group
 
 const mat = (color: string, roughness = 0.8, metalness = 0) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness })
 
-const FABRIC = mat('#6f7f8f', 0.95)
-const FABRIC_WARM = mat('#a8836a', 0.95)
-const WOOD = mat('#a07850', 0.6)
-const WOOD_DARK = mat('#5a3d2b', 0.55)
+let FABRIC = mat('#6f7f8f', 0.95)
+let FABRIC_WARM = mat('#a8836a', 0.95)
+let WOOD = mat('#a07850', 0.6)
+let WOOD_DARK = mat('#5a3d2b', 0.55)
 const WHITE = mat('#f2f0ea', 0.4)
 const METAL = mat('#8a8d91', 0.35, 0.8)
 const BLACK = mat('#1c1d20', 0.3)
-const LINEN = mat('#e8e2d6', 0.95)
+let LINEN = mat('#e8e2d6', 0.95)
+let DUVET = mat('#7d8fa3', 0.95)
+let RUG_FIELD = mat('#e3d2b8', 1)
+let RUG_BORDER = mat('#9b5d4a', 1)
 const LEAF = mat('#3e6b3a', 0.85)
 const POT = mat('#c4a484', 0.8)
 const SHADE = new THREE.MeshStandardMaterial({ color: '#f4ead2', roughness: 0.9, emissive: '#ffe8b0', emissiveIntensity: 0.4 })
 
-// A box whose bottom sits at `y`, centered on x and z.
+// A photographed surface from the library, tinted, or the plain material
+// when that texture set isn't downloaded.
+function surface(name: string, fallback: THREE.MeshStandardMaterial, tint = '#ffffff'): THREE.MeshStandardMaterial {
+  const set = textureSet(MATERIALS[name]?.texture)
+  if (!set) return fallback
+  return new THREE.MeshStandardMaterial({ color: tint, map: set.color, normalMap: set.normal, roughnessMap: set.arm, aoMap: set.arm, roughness: 1, metalness: 0 })
+}
+
+// Called once the library has loaded, before the first build.
+export function useSurfaces() {
+  WOOD = surface('oak-veneer', WOOD)
+  WOOD_DARK = surface('walnut-veneer', WOOD_DARK)
+  LINEN = surface('linen', LINEN, '#f4f0e8')
+  DUVET = surface('linen', DUVET, '#8797aa')
+  FABRIC = surface('wool-herringbone', FABRIC, '#7d8b99')
+  FABRIC_WARM = surface('wool-herringbone', FABRIC_WARM, '#b08c70')
+  RUG_FIELD = surface('wool-herringbone', RUG_FIELD, '#ece2d0')
+  RUG_BORDER = surface('wool-herringbone', RUG_BORDER, '#9b5d4a')
+}
+
+// A box whose bottom sits at `y`, centered on x and z, with UVs in meters.
 function box(group: THREE.Group, material: THREE.Material, w: number, h: number, d: number, x = 0, y = 0, z = 0) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
+  const mesh = new THREE.Mesh(boxInMeters(w, h, d), material)
   mesh.position.set(x, y + h / 2, z)
   mesh.castShadow = true
   mesh.receiveShadow = true
@@ -36,7 +62,7 @@ function box(group: THREE.Group, material: THREE.Material, w: number, h: number,
 }
 
 function cylinder(group: THREE.Group, material: THREE.Material, radiusTop: number, radiusBottom: number, h: number, x = 0, y = 0, z = 0) {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, h, 24), material)
+  const mesh = new THREE.Mesh(cylinderInMeters(radiusTop, radiusBottom, h), material)
   mesh.position.set(x, y + h / 2, z)
   mesh.castShadow = true
   mesh.receiveShadow = true
@@ -160,9 +186,8 @@ const BUILDERS: Record<string, Builder> = {
   },
   'rug/area': ([w, d, h]) => {
     const g = new THREE.Group()
-    const mesh = box(g, mat('#9b5d4a', 1), w, h, d)
-    mesh.castShadow = false
-    box(g, mat('#e3d2b8', 1), w - 0.2, h + 0.002, d - 0.2).castShadow = false
+    box(g, RUG_BORDER, w, h, d).castShadow = false
+    box(g, RUG_FIELD, w - 0.2, h + 0.002, d - 0.2).castShadow = false
     return g
   },
   'tv/stand': ([w, d, h]) => {
@@ -254,7 +279,7 @@ function bed([w, d, h]: [number, number, number]): THREE.Group {
   const g = new THREE.Group()
   box(g, WOOD, w, 0.3, d)
   box(g, LINEN, w - 0.06, 0.22, d - 0.1, 0, 0.3, 0.02)
-  box(g, mat('#7d8fa3', 0.95), w - 0.04, 0.05, d * 0.6, 0, 0.52, -d * 0.18)
+  box(g, DUVET, w - 0.04, 0.05, d * 0.6, 0, 0.52, -d * 0.18)
   box(g, WOOD, w, h, 0.06, 0, 0, d / 2 - 0.03)
   const pillows = w > 1.2 ? [-w / 4, w / 4] : [0]
   for (const x of pillows) box(g, WHITE, Math.min(0.6, w / pillows.length - 0.1), 0.12, 0.38, x, 0.52, d / 2 - 0.3)

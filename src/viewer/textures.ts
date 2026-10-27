@@ -140,3 +140,28 @@ export function contactShadow(): THREE.Texture {
   blob = new THREE.CanvasTexture(canvas)
   return blob
 }
+
+// A box's UVs run 0 to 1 on every face; rescale them to meters so a
+// texture repeats at its real size whatever the piece's dimensions.
+export function boxInMeters(width: number, height: number, depth: number): THREE.BoxGeometry {
+  const geometry = new THREE.BoxGeometry(width, height, depth)
+  const uv = geometry.attributes.uv
+  // Faces in order: +x, -x, +y, -y, +z, -z, four vertices each.
+  const spans: [number, number][] = [[depth, height], [depth, height], [width, depth], [width, depth], [width, height], [width, height]]
+  for (let face = 0; face < 6; face++) {
+    for (let v = 0; v < 4; v++) {
+      const i = face * 4 + v
+      uv.setXY(i, uv.getX(i) * spans[face][0], uv.getY(i) * spans[face][1])
+    }
+  }
+  return geometry
+}
+
+// A cylinder whose side UVs run in meters around and up it.
+export function cylinderInMeters(radiusTop: number, radiusBottom: number, height: number, segments = 24): THREE.CylinderGeometry {
+  const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments)
+  const uv = geometry.attributes.uv
+  const around = Math.PI * (radiusTop + radiusBottom)
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * around, uv.getY(i) * height)
+  return geometry
+}

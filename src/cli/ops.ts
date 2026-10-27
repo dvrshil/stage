@@ -32,7 +32,7 @@ export async function newScene(path: string, name: string, from = 'empty'): Prom
   mkdirSync(dirname(target), { recursive: true })
   if (from !== 'empty') {
     const example = join(EXAMPLES, from, 'scene.json')
-    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, or empty`)
+    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, or empty`)
     await copyFile(example, target)
     return target
   }

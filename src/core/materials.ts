@@ -37,6 +37,11 @@ export const MATERIALS: Record<string, Material> = {
   'carpet-beige': { color: '#c9bba4', roughness: 1, pattern: 'speckle' },
   'marble-white': { color: '#efede8', roughness: 0.3, texture: 'marble_01', pattern: 'tiles', tile: 0.8 },
   'brick-red': { color: '#9a4a3a', roughness: 0.9 },
+  // Furniture surfaces, which floors and walls can use too.
+  'oak-veneer': { color: '#b8925f', roughness: 0.6, texture: 'oak_veneer_01', pattern: 'planks' },
+  'walnut-veneer': { color: '#5d4330', roughness: 0.55, texture: 'mocha_oak_veneer', pattern: 'planks' },
+  'linen': { color: '#e8e2d6', roughness: 1, texture: 'rough_linen', pattern: 'speckle' },
+  'wool-herringbone': { color: '#b9ab96', roughness: 1, texture: 'poly_wool_herringbone', pattern: 'speckle' },
 }
 
 export const DEFAULT_MATERIALS = {

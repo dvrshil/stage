@@ -1,0 +1,122 @@
+{
+  "stage": "0.1",
+  "name": "Flat with a bedroom",
+  "units": "m",
+  "levels": [
+    { "id": "ground", "elevation": 0, "height": 2.7 }
+  ],
+  "rooms": [
+    {
+      "id": "living",
+      "level": "ground",
+      "name": "Living room",
+      "floor": [[0, 0], [5.5, 0], [5.5, 4], [0, 4]],
+      "materials": { "floor": "oak-plank", "walls": "plaster-white" }
+    },
+    {
+      "id": "kitchen",
+      "level": "ground",
+      "name": "Kitchen",
+      "floor": [[5.5, 0], [9, 0], [9, 4], [5.5, 4]],
+      "materials": { "floor": "tile-grey", "walls": "paint-sage" }
+    },
+    {
+      "id": "bedroom",
+      "level": "ground",
+      "name": "Bedroom",
+      "floor": [[9, 0], [12.5, 0], [12.5, 4], [9, 4]],
+      "materials": { "floor": "herringbone-oak", "walls": "paint-navy" }
+    }
+  ],
+  "openings": [
+    {
+      "id": "front-door",
+      "wall": { "room": "living", "edge": 3 },
+      "at": 0.8,
+      "type": "door",
+      "width": 0.9,
+      "height": 2.1,
+      "swing": "in-left"
+    },
+    {
+      "id": "living-window",
+      "wall": { "room": "living", "edge": 2 },
+      "at": 1.5,
+      "type": "window",
+      "width": 2,
+      "height": 1.4,
+      "sill": 0.9
+    },
+    {
+      "id": "kitchen-window",
+      "wall": { "room": "kitchen", "edge": 2 },
+      "at": 1,
+      "type": "window",
+      "width": 1.5,
+      "height": 1.2,
+      "sill": 1
+    },
+    {
+      "id": "pass-through",
+      "wall": { "room": "living", "edge": 1 },
+      "at": 0.75,
+      "type": "opening",
+      "width": 2.5,
+      "height": 2.4
+    },
+    {
+      "id": "bedroom-door",
+      "wall": { "room": "kitchen", "edge": 1 },
+      "at": 0.35,
+      "type": "door",
+      "width": 0.85,
+      "height": 2.1,
+      "swing": "out-left"
+    },
+    {
+      "id": "bedroom-window",
+      "wall": { "room": "bedroom", "edge": 2 },
+      "at": 0.9,
+      "type": "window",
+      "width": 1.7,
+      "height": 1.4,
+      "sill": 0.8
+    }
+  ],
+  "items": [
+    { "id": "sofa", "asset": "sofa/three-seat", "room": "living", "at": [2.2, 3.3], "facing": 180 },
+    { "id": "coffee-table", "asset": "table/coffee", "room": "living", "at": [2.2, 2.1] },
+    { "id": "rug", "asset": "rug/area", "room": "living", "at": [2.2, 2.3] },
+    { "id": "tv", "asset": "tv/stand", "room": "living", "at": [2.2, 0.35], "facing": 0 },
+    { "id": "plant", "asset": "plant/large-potted", "room": "living", "at": [5, 3.5] },
+    { "id": "bookcase", "asset": "shelf/bookcase", "room": "living", "at": [0.42, 1], "facing": 90 },
+    { "id": "counter", "asset": "kitchen/counter-two-meter", "room": "kitchen", "at": [7.1, 3.55], "facing": 180 },
+    { "id": "fridge", "asset": "kitchen/fridge", "room": "kitchen", "at": [8.5, 3.5], "facing": 180 },
+    { "id": "dining-table", "asset": "table/dining-six", "room": "kitchen", "at": [7.2, 1.6], "facing": 0 },
+    { "id": "chair-1", "asset": "chair/dining", "room": "kitchen", "at": [6.7, 2.55], "facing": 180 },
+    { "id": "chair-2", "asset": "chair/dining", "room": "kitchen", "at": [7.7, 2.55], "facing": 180 },
+    { "id": "chair-3", "asset": "chair/dining", "room": "kitchen", "at": [6.7, 0.65], "facing": 0 },
+    { "id": "chair-4", "asset": "chair/dining", "room": "kitchen", "at": [7.7, 0.65], "facing": 0 },
+    { "id": "reading-chair", "asset": "chair/armchair", "room": "living", "at": [3.95, 0.8], "facing": 330 },
+    { "id": "reading-lamp", "asset": "lamp/floor", "room": "living", "at": [4.6, 0.4] },
+    { "id": "person-living", "asset": "person/standing", "room": "living", "at": [4.55, 2.3], "facing": 265 },
+    { "id": "person-kitchen", "asset": "person/standing", "room": "kitchen", "at": [6.75, 2.95], "facing": 10 },
+    { "id": "side-table", "asset": "table/side", "room": "living", "at": [3.5, 3.6] },
+    { "id": "bed", "asset": "bed/double", "room": "bedroom", "at": [11.3, 1.9], "facing": 270 },
+    { "id": "bedroom-rug", "asset": "rug/area", "room": "bedroom", "at": [11, 1.9], "facing": 90 },
+    { "id": "nightstand-south", "asset": "table/side", "room": "bedroom", "at": [12.1, 0.72], "facing": 270 },
+    { "id": "nightstand-north", "asset": "table/side", "room": "bedroom", "at": [12.1, 3.08], "facing": 270 },
+    { "id": "reading-lamp-bed", "asset": "lamp/desk", "room": "bedroom", "at": [12.15, 3.1], "facing": 270, "elevation": 0.55 },
+    { "id": "wardrobe", "asset": "wardrobe/double", "room": "bedroom", "at": [9.38, 3.1], "facing": 90 }
+  ],
+  "lights": [
+    { "id": "sun", "type": "sun", "azimuth": 220, "elevation": 35, "intensity": 1 }
+  ],
+  "cameras": [
+    { "id": "from-door", "at": [1.1, 2.6, 1.6], "look": [6, 1.6, 1.3], "fov": 55 },
+    { "id": "kitchen-view", "at": [8.6, 0.45, 1.6], "look": [6.3, 3.2, 1.2], "fov": 55 },
+    { "id": "plan", "type": "plan" },
+    { "id": "orbit", "type": "orbit" },
+    { "id": "bedroom-view", "at": [9.5, 0.55, 1.6], "look": [11.7, 2.4, 0.9], "fov": 55 }
+  ]
+}

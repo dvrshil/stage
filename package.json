@@ -4,11 +4,14 @@
   "description": "An AI-native 3D scene engine: agents write one scene file, people walk through it in a browser.",
   "type": "module",
   "license": "MIT",
-  "bin": { "stage": "bin/stage" },
+  "bin": {
+    "stage": "bin/stage"
+  },
   "scripts": {
     "build": "vite build",
-    "test": "node --test tests/",
-    "typecheck": "tsc --noEmit"
+    "test": "node --no-warnings --test tests/core.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test:render": "node --no-warnings --test tests/render.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

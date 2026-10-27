@@ -46,8 +46,8 @@ export async function runMcp(): Promise<void> {
   server.registerTool(
     'new_scene',
     {
-      description: 'Create a scene file, empty (one room, one door) or copied from an example ("flat": a furnished two-room flat). Refuses to overwrite.',
-      inputSchema: { path: scenePath, name: z.string().default('Untitled scene'), from: z.enum(['empty', 'flat']).default('empty') },
+      description: 'Create a scene file, empty (one room, one door) or copied from an example ("flat": a furnished two-room flat; "flat-with-bedroom": the same with a bedroom and a person in each room). Refuses to overwrite.',
+      inputSchema: { path: scenePath, name: z.string().default('Untitled scene'), from: z.enum(['empty', 'flat', 'flat-with-bedroom']).default('empty') },
     },
     ({ path, name, from }) => guarded(async () => [text({ scene: await newScene(path, name, from) })]),
   )

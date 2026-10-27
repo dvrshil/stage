@@ -184,6 +184,98 @@
           "md5": "51017a4e4f320c3b58763c66727d89c1"
         }
       }
+    },
+    "oak_veneer_01": {
+      "source": "https://polyhaven.com/a/oak_veneer_01",
+      "license": "CC0",
+      "size": [
+        1.83,
+        1.83
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/oak_veneer_01/1k/color.jpg",
+          "md5": "39a99df4e328d62d74f3122722a64a95"
+        },
+        "normal": {
+          "file": "polyhaven/oak_veneer_01/1k/normal.jpg",
+          "md5": "d05406f5fdaf51f0d7b115b35d9af1b7"
+        },
+        "arm": {
+          "file": "polyhaven/oak_veneer_01/1k/arm.jpg",
+          "md5": "dfba0f063663289248f4e887f836bdcc"
+        }
+      }
+    },
+    "mocha_oak_veneer": {
+      "source": "https://polyhaven.com/a/mocha_oak_veneer",
+      "license": "CC0",
+      "size": [
+        1,
+        1
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/mocha_oak_veneer/1k/color.jpg",
+          "md5": "85068223fdbe9e4078796a67ff406f32"
+        },
+        "normal": {
+          "file": "polyhaven/mocha_oak_veneer/1k/normal.jpg",
+          "md5": "5e6e5bc28df0860845a1d0d8727268ff"
+        },
+        "arm": {
+          "file": "polyhaven/mocha_oak_veneer/1k/arm.jpg",
+          "md5": "c503151e023364b451899f6617499d3a"
+        }
+      }
+    },
+    "rough_linen": {
+      "source": "https://polyhaven.com/a/rough_linen",
+      "license": "CC0",
+      "size": [
+        0.271,
+        0.271
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/rough_linen/1k/color.jpg",
+          "md5": "663db789fb075462b685c1f740e58930"
+        },
+        "normal": {
+          "file": "polyhaven/rough_linen/1k/normal.jpg",
+          "md5": "3350269a2e9c472aa406bd3cc1eaf2c8"
+        },
+        "arm": {
+          "file": "polyhaven/rough_linen/1k/arm.jpg",
+          "md5": "ffe777973056d79d6b2a1324e8451295"
+        }
+      }
+    },
+    "poly_wool_herringbone": {
+      "source": "https://polyhaven.com/a/poly_wool_herringbone",
+      "license": "CC0",
+      "size": [
+        0.27,
+        0.276
+      ],
+      "resolution": "1k",
+      "maps": {
+        "color": {
+          "file": "polyhaven/poly_wool_herringbone/1k/color.jpg",
+          "md5": "5c0981092ba0129d5951720ea23d50c2"
+        },
+        "normal": {
+          "file": "polyhaven/poly_wool_herringbone/1k/normal.jpg",
+          "md5": "a6371d03b033a1c20e1c2758136ac757"
+        },
+        "arm": {
+          "file": "polyhaven/poly_wool_herringbone/1k/arm.jpg",
+          "md5": "30cb990f0569e90c5e7e7ef81f0e3b6f"
+        }
+      }
     }
   },
   "skies": {

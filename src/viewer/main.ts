@@ -12,6 +12,7 @@ import { alongWall, centroid, distanceToSegment, pointInPolygon, sceneBounds, wa
 import { SKY } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { applyCutaway, buildScene, toWorld, type Built } from './build.ts'
+import { useSurfaces } from './furniture.ts'
 import { loadLibrary, loadSky, settled, type Sky } from './library.ts'
 import { speckle } from './textures.ts'
 
@@ -657,6 +658,7 @@ async function start() {
     resize()
     phase('library')
     await loadLibrary()
+    useSurfaces()
     phase('scene')
     await load(true)
     phase('sky')

@@ -5,7 +5,7 @@ import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { buildItem, textSprite } from './furniture.ts'
 import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
-import { planks, speckle, tiles } from './textures.ts'
+import { boxInMeters, planks, speckle, tiles } from './textures.ts'
 
 // Plan coordinates [x, y] (y north) become three.js [x, -z] with y up, so
 // north is -z. Everything the agent writes is in plan terms; this file is
@@ -76,22 +76,6 @@ function lit(material: THREE.Material): THREE.Material {
   glowing.emissive = new THREE.Color('#fff1d8')
   glowing.emissiveIntensity = 1.6
   return glowing
-}
-
-// A box's UVs run 0 to 1 on every face; rescale them to meters so a
-// texture repeats at its real size whatever the piece's dimensions.
-function boxInMeters(width: number, height: number, depth: number): THREE.BoxGeometry {
-  const geometry = new THREE.BoxGeometry(width, height, depth)
-  const uv = geometry.attributes.uv
-  // Faces in order: +x, -x, +y, -y, +z, -z, four vertices each.
-  const spans: [number, number][] = [[depth, height], [depth, height], [width, depth], [width, depth], [width, height], [width, height]]
-  for (let face = 0; face < 6; face++) {
-    for (let v = 0; v < 4; v++) {
-      const i = face * 4 + v
-      uv.setXY(i, uv.getX(i) * spans[face][0], uv.getY(i) * spans[face][1])
-    }
-  }
-  return geometry
 }
 
 // Built scenes are cached by material name, so a rebuild after an edit
