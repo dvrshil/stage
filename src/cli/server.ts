@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync, watch, type FSWatcher } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve } from 'node:path'
@@ -34,11 +34,32 @@ export interface StageServer {
   close(): Promise<void>
 }
 
+// The stamp vite writes into each build, so open pages can tell they are stale.
+function buildStamp(): string {
+  try {
+    return /name="stage-build" content="([^"]*)"/.exec(readFileSync(join(DIST, 'index.html'), 'utf8'))?.[1] ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
   if (!existsSync(join(DIST, 'index.html'))) {
     throw new Error(`the viewer is not built; run: npm run build (in ${resolve(DIST, '..')})`)
   }
   const channels = new Map<string, Channel>()
+  let stamp = buildStamp()
+  let rebuildTimer: NodeJS.Timeout | undefined
+  // A rebuild of the viewer tells every open page to reload.
+  const distWatcher = watch(DIST, () => {
+    clearTimeout(rebuildTimer)
+    rebuildTimer = setTimeout(() => {
+      const next = buildStamp()
+      if (!next || next === stamp) return
+      stamp = next
+      for (const c of channels.values()) for (const client of c.clients) client.write(`event: hello\ndata: ${JSON.stringify({ build: stamp })}\n\n`)
+    }, 300)
+  })
 
   const channel = (path: string): Channel => {
     let c = channels.get(path)
@@ -93,6 +114,7 @@ export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
       if (url.pathname === '/api/events') {
         response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' })
         response.write(': connected\n\n')
+        response.write(`event: hello\ndata: ${JSON.stringify({ build: stamp })}\n\n`)
         const c = channel(path)
         c.clients.add(response)
         const ping = setInterval(() => response.write(': ping\n\n'), 15000)
@@ -130,6 +152,7 @@ export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
     url: `http://127.0.0.1:${actual}`,
     port: actual,
     close: async () => {
+      distWatcher.close()
       for (const c of channels.values()) {
         c.watcher?.close()
         for (const client of c.clients) client.end()

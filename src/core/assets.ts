@@ -34,6 +34,8 @@ export const ASSETS: AssetInfo[] = [
   { id: 'bath/toilet', name: 'Toilet', category: 'bath', size: [0.4, 0.7, 0.8], tags: ['toilet', 'wc', 'bathroom'] },
   { id: 'bath/basin', name: 'Basin on a cabinet', category: 'bath', size: [0.6, 0.5, 0.85], tags: ['basin', 'sink', 'bathroom', 'vanity'] },
   { id: 'bath/tub', name: 'Bathtub', category: 'bath', size: [1.7, 0.75, 0.6], tags: ['bath', 'tub', 'bathtub', 'bathroom'] },
+  { id: 'kitchen/wall-cabinets', name: 'Wall cabinets, 2 m (hung 1.45 to 2.15 m)', category: 'kitchen', size: [2.0, 0.35, 2.15], tags: ['kitchen', 'cabinet', 'wall', 'upper', 'storage'] },
+  { id: 'person/standing', name: 'Standing person, 1.75 m', category: 'person', size: [0.5, 0.3, 1.75], tags: ['person', 'human', 'people', 'figure', 'scale', 'adult'] },
 ]
 
 export function findAsset(id: string): AssetInfo | undefined {

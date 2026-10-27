@@ -1,8 +1,9 @@
 import * as THREE from 'three'
-import { alongWall, centroid, roomElevation, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
+import { alongWall, area, centroid, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
 import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { buildItem, textSprite } from './furniture.ts'
+import { planks, speckle, tiles } from './textures.ts'
 
 // Plan coordinates [x, y] (y north) become three.js [x, -z] with y up, so
 // north is -z. Everything the agent writes is in plan terms; this file is
@@ -13,6 +14,8 @@ const EXTERIOR = new THREE.MeshStandardMaterial({ color: '#d6cfc2', roughness: 0
 const GLASS = new THREE.MeshPhysicalMaterial({ color: '#cfe3ee', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.28 })
 const FRAME = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.5 })
 const DOOR = new THREE.MeshStandardMaterial({ color: '#b08a62', roughness: 0.6 })
+const TRIM = new THREE.MeshStandardMaterial({ color: '#f3f1ec', roughness: 0.45 })
+const FIXTURE = new THREE.MeshStandardMaterial({ color: '#fffaf0', emissive: '#fff1d6', emissiveIntensity: 2.2, roughness: 0.4 })
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>()
 function material(name: string | undefined, fallback: string): THREE.MeshStandardMaterial {
@@ -26,11 +29,30 @@ function material(name: string | undefined, fallback: string): THREE.MeshStandar
   return m
 }
 
+// Floors carry UVs in meters, so a pattern repeats at its real size.
+const floorCache = new Map<string, THREE.MeshStandardMaterial>()
+function floorMaterial(name: string | undefined): THREE.MeshStandardMaterial {
+  const key = name && MATERIALS[name] ? name : DEFAULT_MATERIALS.floor
+  let m = floorCache.get(key)
+  if (m) return m
+  const spec = MATERIALS[key]
+  m = new THREE.MeshStandardMaterial({ roughness: spec.roughness, metalness: spec.metalness ?? 0 })
+  if (spec.pattern === 'planks') m.map = planks(spec.color)
+  else if (spec.pattern === 'tiles') m.map = tiles(spec.color, spec.tile ?? 0.6)
+  else if (spec.pattern === 'speckle') m.map = speckle(spec.color, 1)
+  else m.color.set(spec.color)
+  floorCache.set(key, m)
+  return m
+}
+
 export interface Built {
   root: THREE.Group
   // Every entity's objects by id, for highlighting and focusing.
   entities: Map<string, THREE.Object3D>
   labels: THREE.Group
+  // Ceilings and their lights: shown at eye level, hidden in the overviews
+  // so a person can see into every room from above.
+  indoor: THREE.Object3D[]
   sun?: THREE.DirectionalLight
 }
 
@@ -38,6 +60,7 @@ export function buildScene(scene: Scene): Built {
   const root = new THREE.Group()
   const labels = new THREE.Group()
   const entities = new Map<string, THREE.Object3D>()
+  const indoor: THREE.Object3D[] = []
   root.add(labels)
 
   for (const room of scene.rooms) {
@@ -45,7 +68,7 @@ export function buildScene(scene: Scene): Built {
     group.name = room.id
     const elevation = roomElevation(scene, room)
     const shape = new THREE.Shape(room.floor.map(([x, y]) => new THREE.Vector2(x, y)))
-    const floor = new THREE.Mesh(new THREE.ShapeGeometry(shape), material(room.materials?.floor, DEFAULT_MATERIALS.floor))
+    const floor = new THREE.Mesh(new THREE.ShapeGeometry(shape), floorMaterial(room.materials?.floor))
     // The shape is drawn in plan x/y; lay it down so plan y becomes -z.
     floor.rotation.x = -Math.PI / 2
     floor.position.y = elevation
@@ -53,6 +76,27 @@ export function buildScene(scene: Scene): Built {
     group.add(floor)
     root.add(group)
     entities.set(room.id, group)
+
+    // The ceiling is a thin slab, so it also shades the room from the sun.
+    const height = roomHeight(scene, room)
+    const ceiling = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false }), material(room.materials?.ceiling, DEFAULT_MATERIALS.ceiling))
+    ceiling.rotation.x = -Math.PI / 2
+    ceiling.position.y = elevation + height
+    ceiling.castShadow = true
+    ceiling.receiveShadow = true
+    group.add(ceiling)
+    indoor.push(ceiling)
+
+    // One ceiling light per room, brighter for bigger rooms.
+    const [lx, ly] = centroid(room.floor)
+    const fixture = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 32), FIXTURE)
+    fixture.position.copy(toWorld([lx, ly], elevation + height - 0.02))
+    group.add(fixture)
+    indoor.push(fixture)
+    const lamp = new THREE.PointLight('#ffe6c4', 3.2 * Math.sqrt(Math.max(4, area(room.floor))), 0, 2)
+    lamp.position.copy(toWorld([lx, ly], elevation + height - 0.35))
+    group.add(lamp)
+    indoor.push(lamp)
 
     const [cx, cy] = centroid(room.floor)
     const label = textSprite(room.name ?? room.id, 0.05, 0.42)
@@ -110,7 +154,7 @@ export function buildScene(scene: Scene): Built {
     }
   }
 
-  return { root, entities, labels, sun }
+  return { root, entities, labels, indoor, sun }
 }
 
 // One box per solid piece, with a material per face: the room's wall paint
@@ -158,6 +202,21 @@ function buildWall(wall: Wall, rooms: Map<string, Scene['rooms'][number]>): THRE
     mesh.receiveShadow = true
     if (outward) mesh.userData.cutaway = { outward, bottom: piece.bottom, top: piece.top, base: wall.elevation }
     group.add(mesh)
+
+    if (piece.bottom === 0 && piece.to - piece.from > 0.02) {
+      // Baseboards, 8 cm, on each side that has a room. Local +z is the
+      // plan's right side of a -> b.
+      const across = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle))
+      const middle = alongWall(wall, (piece.from + piece.to) / 2)
+      for (const [room, sign] of [[rightRoom, 1], [leftRoom, -1]] as const) {
+        if (!room) continue
+        const board = new THREE.Mesh(new THREE.BoxGeometry(piece.to - piece.from, 0.08, 0.014), TRIM)
+        board.position.copy(toWorld(middle, wall.elevation + 0.04)).addScaledVector(across, sign * (wall.thickness / 2 + 0.007))
+        board.rotation.y = angle
+        board.receiveShadow = true
+        group.add(board)
+      }
+    }
   }
   return group
 }
@@ -208,6 +267,10 @@ function buildOpening(wall: Wall, hole: Wall['openings'][number]): THREE.Object3
     bar(frame, opening.height, -width / 2 + frame / 2, opening.height / 2)
     bar(frame, opening.height, width / 2 - frame / 2, opening.height / 2)
     bar(0.03, opening.height, 0, opening.height / 2)
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(width + 0.08, 0.03, wall.thickness + 0.06), TRIM)
+    sill.position.y = -0.015
+    sill.receiveShadow = true
+    group.add(sill)
     return group
   }
 
@@ -224,6 +287,19 @@ function buildOpening(wall: Wall, hole: Wall['openings'][number]): THREE.Object3
     const sign = (hingeLeft ? 1 : -1) * (inward ? 1 : -1)
     hinge.rotation.y = sign * THREE.MathUtils.degToRad(70)
     group.add(hinge)
+    // A 7 cm casing on both faces, standing 1.5 cm proud of the wall.
+    const depth = wall.thickness + 0.03
+    const jamb = (x: number) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.07, opening.height + 0.07, depth), TRIM)
+      mesh.position.set(x, (opening.height + 0.07) / 2, 0)
+      mesh.castShadow = true
+      group.add(mesh)
+    }
+    jamb(-width / 2 - 0.035)
+    jamb(width / 2 + 0.035)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(width + 0.14, 0.07, depth), TRIM)
+    head.position.set(0, opening.height + 0.035, 0)
+    group.add(head)
     return group
   }
 

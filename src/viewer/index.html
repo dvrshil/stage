@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="stage-build" content="__STAGE_BUILD__" />
     <title>Stage</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -13,6 +14,7 @@
         <div id="title" class="title">Stage</div>
         <div id="camera" class="chip"></div>
       </div>
+      <div id="toolbar" class="toolbar"></div>
       <div class="bottom">
         <div id="selection" class="panel hidden"></div>
         <div id="status" class="panel"></div>
@@ -20,15 +22,16 @@
       </div>
       <div id="help" class="panel help hidden">
         <div class="help-title">Keys</div>
-        <div><kbd>C</kbd> next camera</div>
-        <div><kbd>O</kbd> orbit view</div>
-        <div><kbd>P</kbd> plan view</div>
-        <div><kbd>V</kbd> walk (WASD, mouse to look, Esc to stop)</div>
+        <div><kbd>V</kbd> walk inside: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, mouse to look, <kbd>Shift</kbd> to hurry, <kbd>Esc</kbd> to stop</div>
+        <div><kbd>O</kbd> overview, <kbd>P</kbd> plan, <kbd>C</kbd> next camera</div>
         <div><kbd>L</kbd> room labels</div>
-        <div>Click an item to see its id</div>
+        <div>Drag to orbit, scroll to zoom, right-drag to pan</div>
+        <div>Click anything to see its id and size</div>
         <div><kbd>?</kbd> this list</div>
       </div>
       <div class="hint"><kbd>?</kbd> keys</div>
+      <div class="crosshair"></div>
+      <div class="walk-hint panel"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · mouse to look · <kbd>Shift</kbd> hurry · <kbd>Esc</kbd> stop</div>
     </div>
     <script type="module" src="./main.ts"></script>
   </body>

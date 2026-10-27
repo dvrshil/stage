@@ -77,7 +77,9 @@ export const Camera = z.object({
   type: z.enum(['perspective', 'plan', 'orbit']).default('perspective'),
   at: point3.optional(),
   look: point3.optional(),
-  fov: z.number().min(10).max(150).default(70),
+  // Vertical degrees. 55 is about a 24 mm lens on full frame: wide enough
+  // for a room, without the stretching of anything wider.
+  fov: z.number().min(10).max(150).default(55),
 })
 
 export const Scene = z.object({
