@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import { alongWall, area, centroid, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
+import { FIXTURES } from '../core/assets.ts'
 import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { buildItem, textSprite } from './furniture.ts'
-import { textureSet } from './library.ts'
+import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
 import { planks, speckle, tiles } from './textures.ts'
 
 // Plan coordinates [x, y] (y north) become three.js [x, -z] with y up, so
@@ -68,6 +69,13 @@ function floorMaterial(name: string | undefined): THREE.MeshStandardMaterial {
   }
   floorCache.set(key, m)
   return m
+}
+
+function lit(material: THREE.Material): THREE.Material {
+  const glowing = material.clone() as THREE.MeshStandardMaterial
+  glowing.emissive = new THREE.Color('#fff1d8')
+  glowing.emissiveIntensity = 1.6
+  return glowing
 }
 
 // A box's UVs run 0 to 1 on every face; rescale them to meters so a
@@ -137,12 +145,37 @@ export function buildScene(scene: Scene): Built {
 
     // One ceiling light per room, brighter for bigger rooms.
     const [lx, ly] = centroid(room.floor)
-    const fixture = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 32), FIXTURE)
-    fixture.position.copy(toWorld([lx, ly], elevation + height - 0.02))
+    const fixture = new THREE.Group()
+    fixture.position.copy(toWorld([lx, ly], elevation))
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 32), FIXTURE)
+    disc.position.y = height - 0.02
+    fixture.add(disc)
     group.add(fixture)
     indoor.push(fixture)
+    // A globe pendant once downloaded, its glass at 2.15 m so nobody walks
+    // into it; any cord longer than that disappears into the ceiling.
+    const globeBottom = Math.min(2.15, height - 0.45)
+    if (hasModel(FIXTURES.ceilingLamp)) {
+      loadModel(FIXTURES.ceilingLamp).then((model) => {
+        if (!model) return
+        fixture.remove(disc)
+        const pendant = fitModel(model, [0.43, 0.43, 0.95], 0)
+        pendant.position.y = globeBottom
+        // The globe glows: it is the light. Its material is cloned, so the
+        // glow stays on lit fixtures and off the shared model.
+        pendant.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return
+          object.castShadow = false
+          const glows = (m: THREE.Material) => /glass|globe/i.test(m.name)
+          object.material = Array.isArray(object.material)
+            ? object.material.map((m) => (glows(m) ? lit(m) : m))
+            : glows(object.material) ? lit(object.material) : object.material
+        })
+        fixture.add(pendant)
+      })
+    }
     const lamp = new THREE.PointLight('#ffe6c4', 5 * Math.sqrt(Math.max(4, area(room.floor))), 0, 2)
-    lamp.position.copy(toWorld([lx, ly], elevation + height - 0.35))
+    lamp.position.copy(toWorld([lx, ly], elevation + (hasModel(FIXTURES.ceilingLamp) ? globeBottom + 0.2 : height - 0.35)))
     group.add(lamp)
     indoor.push(lamp)
 

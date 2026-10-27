@@ -23,10 +23,21 @@ export interface LockedSky {
   hdr: LockedFile
 }
 
+export interface LockedModel {
+  source: string
+  license: 'CC0'
+  resolution: string
+  gltf: LockedFile
+  files: LockedFile[]
+  // Width (x), depth (z), height (y) in meters, as modeled, front toward +z.
+  size: [number, number, number]
+}
+
 export interface Lock {
   version: 1
   textures: Record<string, LockedTexture>
   skies: Record<string, LockedSky>
+  models: Record<string, LockedModel>
 }
 
-export const EMPTY_LOCK: Lock = { version: 1, textures: {}, skies: {} }
+export const EMPTY_LOCK: Lock = { version: 1, textures: {}, skies: {}, models: {} }

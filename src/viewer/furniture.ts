@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { findAsset } from '../core/assets.ts'
+import { fitModel, hasModel, loadModel } from './library.ts'
 import { contactShadow } from './textures.ts'
 
 // Furniture built from primitives, by asset id. Each builder returns a group
@@ -207,15 +208,18 @@ const BUILDERS: Record<string, Builder> = {
 }
 
 // A standing adult, 1.75 m, eyes at about 1.63 m: the scale figure that
-// lets a viewer judge every other size at a glance.
+// lets a viewer judge every other size at a glance. One matte finish, the
+// way architects draw scale figures, so it reads as a measure rather than
+// a character next to photographed furniture.
 function person([, , h]: [number, number, number]): THREE.Group {
   const g = new THREE.Group()
   const k = h / 1.75
-  const skin = mat('#c99a7e', 0.7)
-  const top = mat('#46607e', 0.9)
-  const trousers = mat('#3c3d44', 0.9)
-  const shoes = mat('#24252a', 0.6)
-  const hair = mat('#3a2a1f', 0.9)
+  const figure = mat('#d9d6d0', 0.55)
+  const skin = figure
+  const top = figure
+  const trousers = figure
+  const shoes = mat('#bdb9b2', 0.6)
+  const hair = figure
   const capsule = (material: THREE.Material, radius: number, length: number, x: number, y: number, z = 0, tilt = 0, scaleZ = 1) => {
     const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius * k, length * k, 6, 16), material)
     mesh.position.set(x * k, y * k, z * k)
@@ -343,6 +347,16 @@ export function buildItem(asset: string, label: string, size?: [number, number, 
   const builder = BUILDERS[asset]
   const group = info && builder ? builder(info.size) : placeholder(label, size ?? [0.5, 0.5, 0.5])
   const [w, d] = info?.size ?? size ?? [0.5, 0.5, 0.5]
+  if (info?.model && hasModel(info.model)) {
+    // The primitive piece stands in until the model arrives, then steps
+    // aside; glTF fronts face +z, so the default turn is half a circle.
+    const stand = [...group.children]
+    loadModel(info.model).then((model) => {
+      if (!model) return
+      for (const child of stand) group.remove(child)
+      group.add(fitModel(model, info.size, info.yaw ?? 180))
+    })
+  }
   if (!NO_CONTACT.has(asset)) {
     // Interior lights cast no shadows (too slow), so a soft dark patch
     // under each piece keeps it from looking like it floats.

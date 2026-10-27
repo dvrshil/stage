@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 import { EMPTY_LOCK, type Lock } from '../core/library.ts'
 
@@ -110,4 +111,54 @@ function tameSun(texture: THREE.DataTexture) {
   const data = (texture.image as unknown as { data: Float32Array }).data
   for (let i = 0; i < data.length; i++) if (data[i] > SKY_LIMIT) data[i] = SKY_LIMIT
   texture.needsUpdate = true
+}
+
+const gltfLoader = new GLTFLoader()
+const models = new Map<string, Promise<THREE.Object3D | undefined>>()
+
+export function hasModel(id: string | undefined): boolean {
+  return !!id && !!lock.models?.[id]
+}
+
+// Each model loads once; every placement clones it, sharing its geometry
+// and textures on the GPU.
+export function loadModel(id: string): Promise<THREE.Object3D | undefined> {
+  const entry = lock.models?.[id]
+  if (!entry) return Promise.resolve(undefined)
+  let task = models.get(id)
+  if (!task) {
+    task = gltfLoader
+      .loadAsync(`./library/${entry.gltf.file}`)
+      .then((gltf) => {
+        gltf.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true
+            object.receiveShadow = true
+          }
+        })
+        return gltf.scene as THREE.Object3D
+      })
+      .catch(() => undefined)
+    models.set(id, task)
+    pending.push(task)
+  }
+  return task
+}
+
+// A clone of the model turned by `yaw` degrees, scaled to fit `size`
+// ([width, depth, height] in meters), centered, and standing on y = 0.
+export function fitModel(model: THREE.Object3D, size: [number, number, number], yaw: number): THREE.Group {
+  const holder = new THREE.Group()
+  const instance = model.clone(true)
+  instance.rotation.y = THREE.MathUtils.degToRad(yaw)
+  holder.add(instance)
+  holder.updateMatrixWorld(true)
+  let box = new THREE.Box3().setFromObject(holder)
+  const measured = box.getSize(new THREE.Vector3())
+  instance.scale.setScalar(Math.min(size[0] / measured.x, size[2] / measured.y, size[1] / measured.z))
+  holder.updateMatrixWorld(true)
+  box = new THREE.Box3().setFromObject(holder)
+  const center = box.getCenter(new THREE.Vector3())
+  instance.position.set(-center.x, -box.min.y, -center.z)
+  return holder
 }

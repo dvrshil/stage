@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EMPTY_LOCK, type Lock } from '../core/library.ts'
+import { ASSETS, FIXTURES } from '../core/assets.ts'
 import { MATERIALS, SKY } from '../core/materials.ts'
 
 // Downloads the CC0 texture sets and sky the built-in materials name, from
@@ -17,10 +18,61 @@ const HEADERS = { 'user-agent': 'stage/0.1 (https://github.com; asset fetch)' }
 
 export async function readLock(): Promise<Lock> {
   try {
-    return JSON.parse(await readFile(LOCK_PATH, 'utf8')) as Lock
+    return { ...structuredClone(EMPTY_LOCK), ...(JSON.parse(await readFile(LOCK_PATH, 'utf8')) as Lock) }
   } catch {
     return structuredClone(EMPTY_LOCK)
   }
+}
+
+type Matrix = number[]
+const identity = (): Matrix => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+function multiply(a: Matrix, b: Matrix): Matrix {
+  const out = new Array(16).fill(0)
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]
+  return out
+}
+// A glTF node's local matrix, column-major, from `matrix` or translation,
+// rotation (a quaternion), and scale.
+function local(node: any): Matrix {
+  if (node.matrix) return node.matrix
+  const [x, y, z, w] = node.rotation ?? [0, 0, 0, 1]
+  const [sx, sy, sz] = node.scale ?? [1, 1, 1]
+  const [tx, ty, tz] = node.translation ?? [0, 0, 0]
+  return [
+    (1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
+    2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
+    2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0,
+    tx, ty, tz, 1,
+  ]
+}
+
+// A model's size, from the bounds glTF stores for every mesh position
+// accessor, through each node's transform. No geometry needs reading.
+export function measureGltf(gltf: any): [number, number, number] {
+  const min = [Infinity, Infinity, Infinity]
+  const max = [-Infinity, -Infinity, -Infinity]
+  const visit = (index: number, parent: Matrix) => {
+    const node = gltf.nodes[index]
+    const world = multiply(parent, local(node))
+    if (node.mesh !== undefined) {
+      for (const primitive of gltf.meshes[node.mesh].primitives) {
+        const accessor = gltf.accessors[primitive.attributes.POSITION]
+        if (!accessor?.min || !accessor?.max) continue
+        for (let corner = 0; corner < 8; corner++) {
+          const p = [0, 1, 2].map((axis) => ((corner >> axis) & 1 ? accessor.max[axis] : accessor.min[axis]))
+          for (let axis = 0; axis < 3; axis++) {
+            const v = world[axis] * p[0] + world[4 + axis] * p[1] + world[8 + axis] * p[2] + world[12 + axis]
+            min[axis] = Math.min(min[axis], v)
+            max[axis] = Math.max(max[axis], v)
+          }
+        }
+      }
+    }
+    for (const child of node.children ?? []) visit(child, world)
+  }
+  for (const index of gltf.scenes[gltf.scene ?? 0].nodes) visit(index, identity())
+  const round = (n: number) => Math.round(n * 100) / 100
+  return [round(max[0] - min[0]), round(max[2] - min[2]), round(max[1] - min[1])]
 }
 
 // The lock, limited to what is actually in the cache, for the viewer.
@@ -29,7 +81,8 @@ export async function availableLock(): Promise<Lock> {
   const has = (file: string) => existsSync(join(CACHE, file))
   const textures = Object.fromEntries(Object.entries(lock.textures).filter(([, t]) => has(t.maps.color.file) && has(t.maps.normal.file) && has(t.maps.arm.file)))
   const skies = Object.fromEntries(Object.entries(lock.skies).filter(([, s]) => has(s.hdr.file)))
-  return { version: 1, textures, skies }
+  const models = Object.fromEntries(Object.entries(lock.models ?? {}).filter(([, m]) => has(m.gltf.file) && m.files.every((f) => has(f.file))))
+  return { version: 1, textures, skies, models }
 }
 
 async function json(url: string): Promise<any> {
@@ -84,6 +137,28 @@ export async function fetchAssets(resolution = '1k', log: (line: string) => void
       },
     }
     log(`texture ${id}: ${lock.textures[id].size.join(' x ')} m`)
+  }
+
+  const models = [...new Set([...ASSETS.map((a) => a.model).filter((m): m is string => !!m), ...Object.values(FIXTURES)])]
+  for (const id of models) {
+    const files = await json(`${API}/files/${id}`)
+    const entry = files.gltf?.[resolution]?.gltf as { url: string; md5: string; include: Record<string, { url: string; md5: string }> } | undefined
+    if (!entry) throw new Error(`${id} has no glTF at ${resolution}`)
+    const base = `polyhaven/${id}/${resolution}`
+    const gltfFile = `${base}/${id}.gltf`
+    await download(entry.url, gltfFile, entry.md5)
+    const included = Object.entries(entry.include).map(([path, file]) => ({ path: `${base}/${path}`, ...file }))
+    await Promise.all(included.map((file) => download(file.url, file.path, file.md5)))
+    const size = measureGltf(JSON.parse(await readFile(join(CACHE, gltfFile), 'utf8')))
+    lock.models[id] = {
+      source: `https://polyhaven.com/a/${id}`,
+      license: 'CC0',
+      resolution,
+      gltf: { file: gltfFile, md5: entry.md5 },
+      files: included.map((file) => ({ file: file.path, md5: file.md5 })),
+      size,
+    }
+    log(`model ${id}: ${size.join(' x ')} m`)
   }
 
   // Skies want more pixels than textures: they fill the whole background.

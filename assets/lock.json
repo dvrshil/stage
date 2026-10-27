@@ -196,5 +196,447 @@
         "md5": "2eba3a4d7eeb23cbfbeca364c97e7980"
       }
     }
+  },
+  "models": {
+    "sofa_02": {
+      "source": "https://polyhaven.com/a/sofa_02",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/sofa_02/1k/sofa_02.gltf",
+        "md5": "ec2590dc8433a523d0fe9e507766c16f"
+      },
+      "files": [
+        {
+          "file": "polyhaven/sofa_02/1k/textures/sofa_02_diff_1k.jpg",
+          "md5": "0452c7d8dd3ef414d5ed3055085028a1"
+        },
+        {
+          "file": "polyhaven/sofa_02/1k/textures/sofa_02_arm_1k.jpg",
+          "md5": "78799d978a1117ba83dbffed9af0fa33"
+        },
+        {
+          "file": "polyhaven/sofa_02/1k/textures/sofa_02_nor_gl_1k.jpg",
+          "md5": "968528a369bced172d34275dba5aebf1"
+        },
+        {
+          "file": "polyhaven/sofa_02/1k/sofa_02.bin",
+          "md5": "024d6f57a7c2ee7915430cd6e1c2651e"
+        }
+      ],
+      "size": [
+        1.81,
+        0.82,
+        0.71
+      ]
+    },
+    "Sofa_01": {
+      "source": "https://polyhaven.com/a/Sofa_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/Sofa_01/1k/Sofa_01.gltf",
+        "md5": "b5f8106d38a9e8dcb52b883663bbeed1"
+      },
+      "files": [
+        {
+          "file": "polyhaven/Sofa_01/1k/textures/Sofa_01_diff_1k.jpg",
+          "md5": "a4d07c6c0fd696cb6fa4bd5bad1debc3"
+        },
+        {
+          "file": "polyhaven/Sofa_01/1k/textures/Sofa_01_nor_gl_1k.jpg",
+          "md5": "7e4aca2b86e09375d25182c7bd4580db"
+        },
+        {
+          "file": "polyhaven/Sofa_01/1k/Sofa_01.bin",
+          "md5": "77b6d42bd17eed825d5d65c769c71f0c"
+        },
+        {
+          "file": "polyhaven/Sofa_01/1k/textures/Sofa_01_arm_1k.jpg",
+          "md5": "c7b757edd1f5fb506341be0063b9a3eb"
+        }
+      ],
+      "size": [
+        1.57,
+        0.66,
+        0.8
+      ]
+    },
+    "modern_arm_chair_01": {
+      "source": "https://polyhaven.com/a/modern_arm_chair_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/modern_arm_chair_01/1k/modern_arm_chair_01.gltf",
+        "md5": "a5ce303bc2962fe98b733fcdfa5a842b"
+      },
+      "files": [
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_pillow_nor_gl_1k.jpg",
+          "md5": "6804f34108fcc755f0c84dd3c638270c"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_legs_nor_gl_1k.jpg",
+          "md5": "7cece7eccf75588af5b5df9b095d2c97"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_pillow_arm_1k.jpg",
+          "md5": "772495ddbf26ca3de4b31298f10113b9"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_legs_diff_1k.jpg",
+          "md5": "778f1897e07ff81b2bc338f3d463ad1f"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_legs_arm_1k.jpg",
+          "md5": "9c69cb001df175bddf6d1c2436567fb7"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/modern_arm_chair_01.bin",
+          "md5": "5a8f2ea1c79ea484140e484b2a621670"
+        },
+        {
+          "file": "polyhaven/modern_arm_chair_01/1k/textures/modern_arm_chair_01_pillow_diff_1k.jpg",
+          "md5": "2e4f64c633c3cb1656ad3eabdb3f0607"
+        }
+      ],
+      "size": [
+        0.82,
+        0.99,
+        1.02
+      ]
+    },
+    "dining_chair_02": {
+      "source": "https://polyhaven.com/a/dining_chair_02",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/dining_chair_02/1k/dining_chair_02.gltf",
+        "md5": "5aff75016e0943e84161de89dcc3ceb8"
+      },
+      "files": [
+        {
+          "file": "polyhaven/dining_chair_02/1k/dining_chair_02.bin",
+          "md5": "b7f8a91c0a5249d02de7885f3b242c4e"
+        },
+        {
+          "file": "polyhaven/dining_chair_02/1k/textures/dining_chair_02_nor_gl_1k.jpg",
+          "md5": "9c0e1003f9c8859a2e5c2c7f92a8f238"
+        },
+        {
+          "file": "polyhaven/dining_chair_02/1k/textures/dining_chair_02_diff_1k.jpg",
+          "md5": "6b7b8e4ac0a3aad9ecdf314a97b0ef75"
+        },
+        {
+          "file": "polyhaven/dining_chair_02/1k/textures/dining_chair_02_arm_1k.jpg",
+          "md5": "2b16c9ddb3ea83d200b02de54a4fdcb8"
+        }
+      ],
+      "size": [
+        0.43,
+        0.58,
+        0.97
+      ]
+    },
+    "dining_table": {
+      "source": "https://polyhaven.com/a/dining_table",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/dining_table/1k/dining_table.gltf",
+        "md5": "556aed1f86536dba7cc5917c36ee7ab7"
+      },
+      "files": [
+        {
+          "file": "polyhaven/dining_table/1k/textures/dining_table_nor_gl_1k.jpg",
+          "md5": "f9e982c15242ff9e544d4968c377abb2"
+        },
+        {
+          "file": "polyhaven/dining_table/1k/textures/dining_table_diff_1k.jpg",
+          "md5": "a309bb6839c628305059775d7480c8b7"
+        },
+        {
+          "file": "polyhaven/dining_table/1k/textures/dining_table_arm_1k.jpg",
+          "md5": "0be0f4618ef26ce517ebf049e90bcc7c"
+        },
+        {
+          "file": "polyhaven/dining_table/1k/dining_table.bin",
+          "md5": "13227e80b4c213bd7fee570e0b23fe8c"
+        }
+      ],
+      "size": [
+        2.26,
+        1.39,
+        0.88
+      ]
+    },
+    "modern_coffee_table_01": {
+      "source": "https://polyhaven.com/a/modern_coffee_table_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/modern_coffee_table_01/1k/modern_coffee_table_01.gltf",
+        "md5": "f1c079ab5bc307630258cf3b40910511"
+      },
+      "files": [
+        {
+          "file": "polyhaven/modern_coffee_table_01/1k/modern_coffee_table_01.bin",
+          "md5": "6e8f65bff935af308eab9eff062f6daa"
+        },
+        {
+          "file": "polyhaven/modern_coffee_table_01/1k/textures/modern_coffee_table_01_rough_1k.jpg",
+          "md5": "6ccbc448fa0e2bed32eac52511e84e2c"
+        },
+        {
+          "file": "polyhaven/modern_coffee_table_01/1k/textures/modern_coffee_table_01_diff_1k.jpg",
+          "md5": "356014e027b59c21b3c99ac112e645f9"
+        },
+        {
+          "file": "polyhaven/modern_coffee_table_01/1k/textures/modern_coffee_table_01_nor_gl_1k.jpg",
+          "md5": "d263e6131abc518760d6771390bc5066"
+        }
+      ],
+      "size": [
+        0.6,
+        1.2,
+        0.39
+      ]
+    },
+    "metal_office_desk": {
+      "source": "https://polyhaven.com/a/metal_office_desk",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/metal_office_desk/1k/metal_office_desk.gltf",
+        "md5": "723956efef6da35ad41494efa5c3b820"
+      },
+      "files": [
+        {
+          "file": "polyhaven/metal_office_desk/1k/textures/metal_office_desk_nor_gl_1k.jpg",
+          "md5": "bcf6793df61d9b5f097f2b9518866c45"
+        },
+        {
+          "file": "polyhaven/metal_office_desk/1k/textures/metal_office_desk_diff_1k.jpg",
+          "md5": "6a27263c95811fa902ddea6476d610e9"
+        },
+        {
+          "file": "polyhaven/metal_office_desk/1k/textures/metal_office_desk_arm_1k.jpg",
+          "md5": "fb76b1e17f07592608d3f144fce4bfce"
+        },
+        {
+          "file": "polyhaven/metal_office_desk/1k/metal_office_desk.bin",
+          "md5": "96f258b9a64d36ca011f44de23da7c65"
+        }
+      ],
+      "size": [
+        2,
+        0.95,
+        0.79
+      ]
+    },
+    "steel_frame_shelves_01": {
+      "source": "https://polyhaven.com/a/steel_frame_shelves_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/steel_frame_shelves_01/1k/steel_frame_shelves_01.gltf",
+        "md5": "36c93aa3e2757523e3f6336d628033ff"
+      },
+      "files": [
+        {
+          "file": "polyhaven/steel_frame_shelves_01/1k/textures/steel_frame_shelves_01_diff_1k.jpg",
+          "md5": "65520a03f0caf855bcb74a7842a0f937"
+        },
+        {
+          "file": "polyhaven/steel_frame_shelves_01/1k/textures/steel_frame_shelves_01_nor_gl_1k.jpg",
+          "md5": "a87fd3930fc88524d1f43c23e2725fc0"
+        },
+        {
+          "file": "polyhaven/steel_frame_shelves_01/1k/textures/steel_frame_shelves_01_arm_1k.jpg",
+          "md5": "2adddc4cd4dc2be76c171791bb5338cd"
+        },
+        {
+          "file": "polyhaven/steel_frame_shelves_01/1k/steel_frame_shelves_01.bin",
+          "md5": "5728ceb7ff0d9b0b5ba5e7ef970aced9"
+        }
+      ],
+      "size": [
+        10.97,
+        5.02,
+        21.41
+      ]
+    },
+    "side_table_01": {
+      "source": "https://polyhaven.com/a/side_table_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/side_table_01/1k/side_table_01.gltf",
+        "md5": "4f72b88ca0cb4329d09d87788df495f3"
+      },
+      "files": [
+        {
+          "file": "polyhaven/side_table_01/1k/side_table_01.bin",
+          "md5": "344e55dbf8dc39b1bca0ca66b956a8dc"
+        },
+        {
+          "file": "polyhaven/side_table_01/1k/textures/side_table_01_diff_1k.jpg",
+          "md5": "858d3b2c5f7f4c733a5c6a32183b11de"
+        },
+        {
+          "file": "polyhaven/side_table_01/1k/textures/side_table_01_nor_gl_1k.jpg",
+          "md5": "9252911489f1024faad8bb1443d31d9e"
+        },
+        {
+          "file": "polyhaven/side_table_01/1k/textures/side_table_01_arm_1k.jpg",
+          "md5": "79435258a51369b735349763689f1cba"
+        }
+      ],
+      "size": [
+        0.55,
+        0.45,
+        0.55
+      ]
+    },
+    "mid_century_lounge_chair": {
+      "source": "https://polyhaven.com/a/mid_century_lounge_chair",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/mid_century_lounge_chair/1k/mid_century_lounge_chair.gltf",
+        "md5": "474bed17d25e794f39e60d1748dafcc6"
+      },
+      "files": [
+        {
+          "file": "polyhaven/mid_century_lounge_chair/1k/textures/mid_century_lounge_chair_nor_gl_1k.jpg",
+          "md5": "2caa258ba4e50a6be6533ac9ff96587e"
+        },
+        {
+          "file": "polyhaven/mid_century_lounge_chair/1k/textures/mid_century_lounge_chair_diff_1k.jpg",
+          "md5": "7ab2bc1b5ac85a7664a82eedf6c85dde"
+        },
+        {
+          "file": "polyhaven/mid_century_lounge_chair/1k/textures/mid_century_lounge_chair_arm_1k.jpg",
+          "md5": "a0a839c4ae18eb06a5ececc72c0e066f"
+        },
+        {
+          "file": "polyhaven/mid_century_lounge_chair/1k/mid_century_lounge_chair.bin",
+          "md5": "bded2f717792aefe222dca07633b94ce"
+        }
+      ],
+      "size": [
+        1.01,
+        1.19,
+        1.17
+      ]
+    },
+    "potted_plant_02": {
+      "source": "https://polyhaven.com/a/potted_plant_02",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/potted_plant_02/1k/potted_plant_02.gltf",
+        "md5": "9999d7e6c51018a85551840e1bdae656"
+      },
+      "files": [
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_leaves_diff_1k.jpg",
+          "md5": "e8a026bd7bfa6497729d855c59da03ce"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/potted_plant_02.bin",
+          "md5": "cdbd4619b2596c9c469ad34676085fa8"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_pot_rough_1k.jpg",
+          "md5": "68ed80fa32791fb0e81df61a75de40b4"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_leaves_rough_1k.jpg",
+          "md5": "ba934a78cc6496d934c014eb8a33af37"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_pot_diff_1k.jpg",
+          "md5": "97e149c93eb0d962e491d4c82d3ce477"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_leaves_nor_gl_1k.jpg",
+          "md5": "2420d5c0ab87426f5318a5e91d1ea3bb"
+        },
+        {
+          "file": "polyhaven/potted_plant_02/1k/textures/potted_plant_02_pot_nor_gl_1k.jpg",
+          "md5": "fbb44ccc1c6564b2837b79a11ed45d58"
+        }
+      ],
+      "size": [
+        0.7,
+        0.66,
+        0.84
+      ]
+    },
+    "desk_lamp_arm_01": {
+      "source": "https://polyhaven.com/a/desk_lamp_arm_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/desk_lamp_arm_01/1k/desk_lamp_arm_01.gltf",
+        "md5": "29b204485d30e66ee3f183ef45bf4bb3"
+      },
+      "files": [
+        {
+          "file": "polyhaven/desk_lamp_arm_01/1k/textures/desk_lamp_arm_01_nor_gl_1k.jpg",
+          "md5": "5aabbfe920ea6726d5299be7d6224551"
+        },
+        {
+          "file": "polyhaven/desk_lamp_arm_01/1k/textures/desk_lamp_arm_01_arm_1k.jpg",
+          "md5": "0b887af80f561216baa3da94d001d51a"
+        },
+        {
+          "file": "polyhaven/desk_lamp_arm_01/1k/textures/desk_lamp_arm_01_diff_1k.jpg",
+          "md5": "a5c1bf5465da39ca6ca9039dd4e3fd66"
+        },
+        {
+          "file": "polyhaven/desk_lamp_arm_01/1k/desk_lamp_arm_01.bin",
+          "md5": "29ffa5bb6bee35b066e46073124fee1a"
+        }
+      ],
+      "size": [
+        0.2,
+        0.61,
+        0.89
+      ]
+    },
+    "modern_ceiling_lamp_01": {
+      "source": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+      "license": "CC0",
+      "resolution": "1k",
+      "gltf": {
+        "file": "polyhaven/modern_ceiling_lamp_01/1k/modern_ceiling_lamp_01.gltf",
+        "md5": "b85c212ffcc2cb9c74b9e68f314fec3b"
+      },
+      "files": [
+        {
+          "file": "polyhaven/modern_ceiling_lamp_01/1k/textures/modern_ceiling_lamp_01_arm_1k.jpg",
+          "md5": "6667aa4091a273a041715dccd3b83bc8"
+        },
+        {
+          "file": "polyhaven/modern_ceiling_lamp_01/1k/textures/modern_ceiling_lamp_01_diff_1k.jpg",
+          "md5": "7197acc141761c4c417023b9fb58db95"
+        },
+        {
+          "file": "polyhaven/modern_ceiling_lamp_01/1k/modern_ceiling_lamp_01.bin",
+          "md5": "48b86e7e6db78e6d3dfd85b765c3ab68"
+        },
+        {
+          "file": "polyhaven/modern_ceiling_lamp_01/1k/textures/modern_ceiling_lamp_01_nor_gl_1k.jpg",
+          "md5": "f3ebd90aa565968ce1faf25a03b1f912"
+        }
+      ],
+      "size": [
+        0.43,
+        0.43,
+        0.95
+      ]
+    }
   }
 }
