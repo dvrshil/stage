@@ -36,6 +36,9 @@ export const Level = z.object({
   // the level below rise through it; the lowest level has none.
   slab: z.number().min(0).default(0.15),
   plan: Plan.optional(),
+  // A pitched roof over this level's rooms, ridge along their longer side;
+  // without it the top is flat. `pitch` in degrees, `overhang` in meters.
+  roof: z.object({ kind: z.enum(['flat', 'gable']).default('gable'), pitch: z.number().min(5).max(70).default(30), overhang: z.number().min(0).default(0.4) }).optional(),
 })
 
 export const Room = z.object({
@@ -117,6 +120,21 @@ export const Camera = z.object({
   level: id.optional(),
 })
 
+// A material of the scene's own: a color, or a photographed texture set
+// from Poly Haven by its id, mapped at `size` meters per repeat (the set's
+// own measured size when left out). `tint` paints over the photograph,
+// `shade` multiplies it.
+export const CustomMaterial = z.object({
+  id,
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a color like #a0b0c0'),
+  roughness: z.number().min(0).max(1).default(0.8),
+  metalness: z.number().min(0).max(1).default(0),
+  texture: z.string().optional(),
+  size: z.number().positive().optional(),
+  tint: z.boolean().optional(),
+  shade: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+})
+
 export const Scene = z.object({
   stage: z.literal(FORMAT_VERSION),
   name: z.string().min(1),
@@ -127,6 +145,7 @@ export const Scene = z.object({
   items: z.array(Item).default([]),
   lights: z.array(Light).default([]),
   cameras: z.array(Camera).default([]),
+  materials: z.array(CustomMaterial).default([]),
 })
 
 export type Scene = z.infer<typeof Scene>
@@ -137,21 +156,23 @@ export type Opening = z.infer<typeof Opening>
 export type Item = z.infer<typeof Item>
 export type Light = z.infer<typeof Light>
 export type Camera = z.infer<typeof Camera>
+export type CustomMaterial = z.infer<typeof CustomMaterial>
 
 // The order keys are written in, so a formatted file reads top-down the
 // way the schema does and a diff shows only real changes.
 export const KEY_ORDER: Record<string, string[]> = {
-  scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'lights', 'cameras'],
-  level: ['id', 'name', 'elevation', 'height', 'slab', 'plan'],
+  scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'lights', 'cameras', 'materials'],
+  level: ['id', 'name', 'elevation', 'height', 'slab', 'plan', 'roof'],
   plan: ['image', 'scale', 'origin', 'opacity'],
   room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'thickness', 'materials'],
   opening: ['id', 'wall', 'at', 'type', 'width', 'height', 'sill', 'swing'],
   item: ['id', 'asset', 'room', 'at', 'facing', 'elevation', 'size', 'scale'],
   light: ['id', 'type', 'azimuth', 'elevation', 'intensity', 'color', 'at'],
   camera: ['id', 'type', 'at', 'look', 'fov', 'level'],
+  material: ['id', 'color', 'roughness', 'metalness', 'texture', 'size', 'tint', 'shade'],
 }
 
-export const COLLECTIONS = ['levels', 'rooms', 'openings', 'items', 'lights', 'cameras'] as const
+export const COLLECTIONS = ['levels', 'rooms', 'openings', 'items', 'lights', 'cameras', 'materials'] as const
 export type Collection = (typeof COLLECTIONS)[number]
 
 export function jsonSchema(): unknown {

@@ -52,10 +52,18 @@ browser: it updates the moment you write, and outlines what you changed.
 - Walls are 23 cm outside and 11.5 cm between rooms. A room's `thickness`
   makes all of its walls at least that thick (a lift shaft, a hall that
   shares a house's outside wall).
+- `materials` (optional): the scene's own surfaces, used by name like the
+  built-in ones: `{ "id": "lime-plaster", "color": "#e9e2d3", "roughness": 0.9 }`,
+  or with `"texture": "<Poly Haven texture id>"` and `"size"` meters per
+  repeat for a photographed set (fetch it with `fetch_assets` first; until
+  then it renders as the color).
 - `open: true` is outdoors: a terrace, a roof, a garden, a drive. No ceiling;
   a `parapet` (default 1 m, 0 for none) on edges that touch nothing; no wall
   at all where two open rooms meet. Outdoor floors: grass, pavers,
   paving-stone, gravel, asphalt, deck, concrete.
+- A level may carry a `roof`: `{ "kind": "gable", "pitch": 30, "overhang": 0.4 }`
+  puts a pitched roof over its rooms, ridge along their longer side; the
+  top is flat without it.
 - A level may carry a `plan`: `{ "image": "plans/first.jpg", "scale":
   <pixels per meter>, "origin": [px, py] }`, the drawing under the plan
   view, with `origin` the pixel at plan [0, 0]. Render camera `plan:<level>`
@@ -72,9 +80,16 @@ browser: it updates the moment you write, and outlines what you changed.
 2. Doors, openings, windows. `check` names any opening that does not fit its
    wall and says what to change.
 3. Furniture. `query "room <id>"` gives each edge's direction, its neighbor,
-   and its openings, so you can keep doors clear. Put a piece's back against
-   a wall by facing it away from that wall.
-4. Render `orbit` and a camera at eye level. Fix what looks wrong.
+   and its openings; `query "fits <asset> in <room>"` names positions where
+   a piece stands clear of doors and other pieces, back to a wall; `query
+   "free <room>"` gives the clear floor and the longest free run along each
+   wall. Put a piece's back against a wall by facing it away from that
+   wall. `check` reports pieces that run into each other, wardrobes and
+   cabinets without room to open, and things standing on windows.
+4. Render `orbit` and a camera at eye level, or `sheet: true` for every
+   camera and one standing in each room at once. Fix what looks wrong. Call
+   `fetch_assets` with the scene once, so renders show the real models and
+   photographed surfaces instead of stand-ins.
 5. When a person is watching, use `show` to fly their view to what you are
    describing, and keep each change small so they can follow along.
 

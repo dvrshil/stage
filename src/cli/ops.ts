@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { z } from 'zod'
 import { check, type CheckResult } from '../core/check.ts'
-import { Camera, Item, Level, Light, Opening, Room, type Collection } from '../core/schema.ts'
+import { Camera, Item, Level, Light, Opening, Room, type Collection, CustomMaterial } from '../core/schema.ts'
 import { readScene, writeScene } from '../core/store.ts'
 import { DEFAULT_PORT, healthy, viewerUrl } from './server.ts'
 
@@ -21,6 +21,7 @@ const SCHEMAS: Record<Collection, z.ZodType> = {
   levels: Level,
   rooms: Room,
   openings: Opening,
+  materials: CustomMaterial,
   items: Item,
   lights: Light,
   cameras: Camera,

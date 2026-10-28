@@ -72,6 +72,16 @@ export interface RenderOptions {
   width?: number
   height?: number
   timeout?: number
+  // Render these cameras as one contact sheet; width and height are then
+  // the size of each tile.
+  sheet?: string[]
+}
+
+// The size of a contact sheet of `count` tiles.
+export function sheetSize(count: number, tileW: number, tileH: number): { width: number; height: number } {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(count)))
+  const rows = Math.max(1, Math.ceil(count / cols))
+  return { width: cols * tileW, height: rows * (tileH + 28) }
 }
 
 // One browser and one server, reused across renders; the MCP server keeps
@@ -144,11 +154,13 @@ export class Renderer {
   }
 
   async render(scene: string, options: RenderOptions = {}): Promise<Buffer> {
-    const width = options.width ?? 1280
-    const height = options.height ?? 720
+    const width = options.width ?? (options.sheet ? 640 : 1280)
+    const height = options.height ?? (options.sheet ? 360 : 720)
     this.errors.length = 0
-    await this.devtools.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId)
+    const page = options.sheet ? sheetSize(options.sheet.length, width, height) : { width, height }
+    await this.devtools.send('Emulation.setDeviceMetricsOverride', { ...page, deviceScaleFactor: 1, mobile: false }, this.sessionId)
     const extra: Record<string, string> = { headless: '1', w: String(width), h: String(height) }
+    if (options.sheet) extra.sheet = options.sheet.join(',')
     if (options.camera) extra.camera = options.camera
     if (options.level) extra.level = options.level
     if (options.quality) extra.quality = options.quality
@@ -169,6 +181,29 @@ export class Renderer {
     }
     const { data } = await this.devtools.send('Page.captureScreenshot', { format: 'png' }, this.sessionId)
     return Buffer.from(data, 'base64')
+  }
+
+  // The scene as a binary glTF, built by the same page that renders it.
+  async export(scene: string, timeout = 120000): Promise<Buffer> {
+    this.errors.length = 0
+    await this.devtools.send('Page.navigate', { url: viewerUrl(this.server.url, scene, { headless: '1', export: '1', w: '64', h: '64' }) }, this.sessionId)
+    const deadline = Date.now() + timeout
+    for (;;) {
+      const { result } = await this.devtools.send('Runtime.evaluate', { expression: 'document.body ? [document.body.dataset.ready || "", document.body.dataset.error || "", document.body.dataset.phase || ""] : ["", "", ""]', returnByValue: true }, this.sessionId)
+      const [ready, error, phase] = (result?.value ?? ['', '', '']) as [string, string, string]
+      if (ready === '1') break
+      if (ready === 'error') throw new Error(error || 'the viewer could not build the scene')
+      if (Date.now() > deadline) throw new Error(`the export timed out${phase ? ` while ${phase}` : ''}${this.errors.length ? `: ${this.errors.join('; ')}` : ''}`)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    const { result: length } = await this.devtools.send('Runtime.evaluate', { expression: 'window.__stageGlb.length', returnByValue: true }, this.sessionId)
+    const total = length.value as number
+    const parts: string[] = []
+    for (let at = 0; at < total; at += 4_000_000) {
+      const { result } = await this.devtools.send('Runtime.evaluate', { expression: `window.__stageGlb.slice(${at}, ${at + 4_000_000})`, returnByValue: true }, this.sessionId)
+      parts.push(result.value as string)
+    }
+    return Buffer.from(parts.join(''), 'base64')
   }
 
   async close() {

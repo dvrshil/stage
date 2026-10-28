@@ -25,7 +25,7 @@ export interface TextureSet {
 
 export async function loadLibrary(): Promise<void> {
   try {
-    lock = (await (await fetch('./api/library', { cache: 'no-store' })).json()) as Lock
+    lock = (await (await fetch(document.body.dataset.bundle ? './library.json' : './api/library', { cache: 'no-store' })).json()) as Lock
   } catch {
     lock = EMPTY_LOCK
   }
@@ -52,18 +52,20 @@ function load(file: string, color: boolean, size: [number, number]): THREE.Textu
   return texture
 }
 
-export function textureSet(id: string | undefined): TextureSet | undefined {
+export function textureSet(id: string | undefined, size?: number): TextureSet | undefined {
   if (!id) return undefined
   const entry = lock.textures[id]
   if (!entry) return undefined
-  let set = textureSets.get(id)
+  const key = size ? `${id}@${size}` : id
+  let set = textureSets.get(key)
   if (!set) {
+    const repeat: [number, number] = size ? [size, size * (entry.size[1] / entry.size[0])] : entry.size
     set = {
-      color: load(entry.maps.color.file, true, entry.size),
-      normal: load(entry.maps.normal.file, false, entry.size),
-      arm: load(entry.maps.arm.file, false, entry.size),
+      color: load(entry.maps.color.file, true, repeat),
+      normal: load(entry.maps.normal.file, false, repeat),
+      arm: load(entry.maps.arm.file, false, repeat),
     }
-    textureSets.set(id, set)
+    textureSets.set(key, set)
   }
   return set
 }

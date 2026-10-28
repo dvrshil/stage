@@ -37,3 +37,26 @@ test('every example camera renders', async () => {
     assert.ok(png.length > 10000, `${camera} rendered an image`)
   }
 })
+
+// Golden renders: every example, from above and from the overview, against
+// the images in tests/golden. A missing golden is written; set
+// UPDATE_GOLDENS=1 to rewrite them all after a deliberate change.
+test('every example matches its golden renders', async () => {
+  const { mkdir, readFile, writeFile } = await import('node:fs/promises')
+  const { existsSync } = await import('node:fs')
+  const { meanDifference } = await import('./png.ts')
+  const dir = new URL('./golden/', import.meta.url).pathname
+  await mkdir(dir, { recursive: true })
+  for (const example of ['flat', 'flat-with-bedroom', 'two-storey']) {
+    for (const camera of ['orbit', 'plan']) {
+      const path = `${dir}${example}-${camera}.png`
+      const png = await renderer.render(new URL(`../examples/${example}/scene.json`, import.meta.url).pathname, { camera, width: 480, height: 270, timeout: 120000 })
+      if (!existsSync(path) || process.env.UPDATE_GOLDENS) {
+        await writeFile(path, png)
+        continue
+      }
+      const difference = meanDifference(await readFile(path), png)
+      assert.ok(difference < 8, `${example} from ${camera} drifted from its golden by ${difference.toFixed(1)} (of 255); UPDATE_GOLDENS=1 if that was intended`)
+    }
+  }
+})

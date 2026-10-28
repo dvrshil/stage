@@ -15,6 +15,8 @@ export interface Material {
   // A color multiplied over the photograph, keeping its detail: greener
   // grass, warmer stone.
   shade?: string
+  // Meters per repeat of the texture, overriding the size Poly Haven measured.
+  size?: number
   // The pattern drawn in code when the texture set isn't downloaded:
   // planks 18 cm wide, or tiles of `tile` meters.
   pattern?: 'planks' | 'tiles' | 'speckle'
@@ -68,4 +70,12 @@ export const DEFAULT_MATERIALS = {
 
 export function materialNames(): string[] {
   return Object.keys(MATERIALS)
+}
+
+// A material by name: the scene's own first, then the built-in ones.
+export function materialSpec(name: string | undefined, custom: readonly { id: string; color: string; roughness: number; metalness: number; texture?: string; size?: number; tint?: boolean; shade?: string }[] = []): Material | undefined {
+  if (!name) return undefined
+  const own = custom.find((m) => m.id === name)
+  if (own) return { color: own.color, roughness: own.roughness, metalness: own.metalness, texture: own.texture, size: own.size, tint: own.tint, shade: own.shade, pattern: 'speckle' }
+  return MATERIALS[name]
 }

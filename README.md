@@ -9,11 +9,22 @@ MCP. A person opens the same file in a browser, watches it change as the
 agent works, and walks through it at eye level.
 
 The first job it does well: turn a floor plan into a furnished home you can
-walk through, to brainstorm what a place could become.
+walk through, to brainstorm what a place could become. Whole houses work:
+several levels with slabs and stairs, double-height rooms, terraces and
+gardens, the architect's drawing under each plan, and a library of about
+two hundred CC0 pieces with real sizes.
 
 | From the front door | The bedroom |
 | --- | --- |
 | ![Living room at eye level](docs/living-room.png) | ![Bedroom at eye level](docs/bedroom.png) |
+
+| A two-storey glass wall onto a shared garden | The same house from the roof |
+| --- | --- |
+| ![A double-height living room with sliding glass](docs/home-living.jpg) | ![A roof garden between two houses](docs/home-roof.jpg) |
+
+| Every camera and every room on one sheet | The plan, with sizes |
+| --- | --- |
+| ![Contact sheet](docs/contact-sheet.jpg) | ![Plan with room sizes](docs/plan-labels.jpg) |
 
 ## Install
 
@@ -78,14 +89,17 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 | --- | --- |
 | `stage new <path> [--from flat]` | Start a scene, empty or from an example |
 | `stage check <scene>` | Schema, references, and spatial rules |
-| `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor |
-| `stage query <scene> rooms` | Also `room <id>`, `items in <room>`, `walls <room>`, `bounds` |
+| `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor, `room:<id>` for a camera standing in any room |
+| `stage render <scene> --all-cameras -o sheet.png` | Every camera, and one per room, as a contact sheet |
+| `stage query <scene> rooms` | Also `room <id>`, `items in <room>`, `walls <room>`, `openings`, `cameras`, `bounds`, `adjacent <room>`, `areas [level]`, `free <room>`, `fits <asset> in <room>` |
 | `stage set <scene> items '<json>'` | Add an entity, or replace the one with its id |
 | `stage remove <scene> <id>` | Remove an entity |
 | `stage open <scene>` | The live viewer in your browser |
 | `stage show <scene> --focus <id>` | Fly every open viewer to an entity |
+| `stage export <scene> -o scene.glb` | The built scene as binary glTF, for Blender or any viewer |
+| `stage share <scene> -o folder` | The viewer, scene, and only the assets it needs, for any static host |
 | `stage assets [words]` | Search the furniture library |
-| `stage assets fetch` | Download the CC0 assets |
+| `stage assets fetch [ids \| scene.json] [--all]` | Download the CC0 assets: the basics, what a scene uses, or everything |
 
 ## The viewer
 
@@ -98,16 +112,20 @@ itself when the viewer is rebuilt, keeping your view.
 ## Assets and licenses
 
 Textures, furniture models, and the sky come from [Poly Haven](https://polyhaven.com),
-all CC0. `assets/lock.json` pins every file by checksum with its source
-and real-world size; the files themselves stay in the local cache. A few
-models are exported at the wrong scale, so the viewer fits each one to the
-real size recorded in `src/core/assets.ts`.
+all CC0. `assets/lock.json` pins every built-in file by checksum with its
+source and real-world size; the files themselves stay in the local cache,
+with on-demand extras recorded in the cache's own lock. The library is
+about sixty curated pieces (`src/core/assets.ts`) plus every household
+model Poly Haven publishes, measured and listed by
+`scripts/grow-library.ts`. A few models are exported at the wrong scale,
+so the viewer fits each one to its recorded size. A scene can also carry
+its own `materials`: a color, or any Poly Haven texture set by id.
 
 ## Development
 
 ```sh
-npm test               # core: check, geometry, query, formatting, assets
-npm run test:render    # headless renders, including determinism
+npm test               # core: check, geometry, query, walking, formatting, assets
+npm run test:render    # headless renders: determinism, and goldens for every example
 npm run typecheck
 ```
 

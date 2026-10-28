@@ -16,12 +16,21 @@ export const LOCK_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../..
 const API = 'https://api.polyhaven.com'
 const HEADERS = { 'user-agent': 'stage/0.1 (https://github.com; asset fetch)' }
 
-export async function readLock(): Promise<Lock> {
+// Extras fetched on demand (models from the generated library, a scene's
+// own textures) are recorded in the cache, not the repository's lock.
+export const CACHE_LOCK = join(CACHE, 'lock.json')
+
+async function readOne(path: string): Promise<Lock> {
   try {
-    return { ...structuredClone(EMPTY_LOCK), ...(JSON.parse(await readFile(LOCK_PATH, 'utf8')) as Lock) }
+    return { ...structuredClone(EMPTY_LOCK), ...(JSON.parse(await readFile(path, 'utf8')) as Lock) }
   } catch {
     return structuredClone(EMPTY_LOCK)
   }
+}
+
+export async function readLock(): Promise<Lock> {
+  const [repo, cache] = await Promise.all([readOne(LOCK_PATH), readOne(CACHE_LOCK)])
+  return { version: 1, textures: { ...cache.textures, ...repo.textures }, skies: { ...cache.skies, ...repo.skies }, models: { ...cache.models, ...repo.models } }
 }
 
 type Matrix = number[]
@@ -174,10 +183,30 @@ export async function fetchSky(id: string, lock: Lock, resolution = '2k'): Promi
   lock.skies[id] = { source: `https://polyhaven.com/a/${id}`, license: 'CC0', resolution, hdr: { file, md5: hdr.md5 } }
 }
 
+// Built-in materials, fixtures, the sky, and the curated models go to the
+// repository's lock; everything else to the cache's.
 export async function writeLock(lock: Lock): Promise<void> {
-  mkdirSync(dirname(LOCK_PATH), { recursive: true })
-  await writeFile(`${LOCK_PATH}.tmp`, `${JSON.stringify(lock, null, 2)}\n`)
-  await rename(`${LOCK_PATH}.tmp`, LOCK_PATH)
+  const builtin = {
+    textures: new Set(Object.values(MATERIALS).map((m) => m.texture).filter(Boolean)),
+    models: new Set([...ASSETS.filter((a) => a.model && !a.generated).map((a) => a.model!), ...Object.values(FIXTURES)]),
+  }
+  const pick = <T,>(record: Record<string, T>, keep: (id: string) => boolean) => Object.fromEntries(Object.entries(record).filter(([id]) => keep(id)))
+  const repo: Lock = { version: 1, textures: pick(lock.textures, (id) => builtin.textures.has(id)), skies: lock.skies, models: pick(lock.models, (id) => builtin.models.has(id)) }
+  const cache: Lock = { version: 1, textures: pick(lock.textures, (id) => !builtin.textures.has(id)), skies: {}, models: pick(lock.models, (id) => !builtin.models.has(id)) }
+  for (const [path, data] of [[LOCK_PATH, repo], [CACHE_LOCK, cache]] as const) {
+    mkdirSync(dirname(path), { recursive: true })
+    await writeFile(`${path}.tmp`, `${JSON.stringify(data, null, 2)}\n`)
+    await rename(`${path}.tmp`, path)
+  }
+}
+
+// What a scene needs from Poly Haven: the models of its items and the
+// texture sets of its own materials.
+export function sceneAssetIds(scene: { items: { asset: string }[]; materials?: { texture?: string }[] }): string[] {
+  const ids = new Set<string>()
+  for (const item of scene.items) if (ASSETS.find((a) => a.id === item.asset)?.model) ids.add(item.asset)
+  for (const material of scene.materials ?? []) if (material.texture) ids.add(material.texture)
+  return [...ids]
 }
 
 // Poly Haven ids a library asset or a scene names: its models, and the

@@ -82,12 +82,12 @@ function references(scene: Scene): Problem[] {
       })
     }
     for (const [slot, name] of Object.entries(room.materials ?? {})) {
-      if (name && !MATERIALS[name]) {
+      if (name && !MATERIALS[name] && !scene.materials.some((m) => m.id === name)) {
         problems.push({
           severity: 'warning',
           path: `rooms.${index}.materials.${slot}`,
           entity: room.id,
-          message: `material "${name}" is not built in and will render as the default; built-in materials are ${Object.keys(MATERIALS).join(', ')}.`,
+          message: `material "${name}" is neither built in nor in "materials", so it renders as the default; built-in materials are ${Object.keys(MATERIALS).join(', ')}.`,
         })
       }
     }

@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { findAsset } from '../core/assets.ts'
 import { check, type Problem } from '../core/check.ts'
+import { allCameras, findCamera } from '../core/cameras.ts'
 import { centroid, levelsByElevation, pointInPolygon, roomElevation, roomHeight, sceneBounds, type Point } from '../core/geometry.ts'
 import { STEP, ground, obstacles, resolve as resolveWalk, type Obstacles } from '../core/walk.ts'
 import { SKY } from '../core/materials.ts'
@@ -21,8 +22,12 @@ import { speckle } from './textures.ts'
 // see the same pixels.
 
 const params = new URLSearchParams(location.search)
-const scenePath = params.get('scene')
+// Opened without a scene, the page is a share bundle: the scene, library,
+// and files sit beside it, and nothing is live.
+const bundled = !params.get('scene')
+const scenePath = params.get('scene') ?? 'scene.json'
 const headless = params.has('headless')
+if (bundled) document.body.dataset.bundle = '1'
 const BUILD = document.querySelector<HTMLMetaElement>('meta[name="stage-build"]')?.content ?? ''
 const $ = (id: string) => document.getElementById(id)!
 if (headless) document.body.classList.add('headless')
@@ -299,6 +304,7 @@ function planLabel(): string {
 function applyView(next: View, label: string) {
   view = next
   if (built) built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
+  if (built) for (const roof of built.roofs) roof.visible = view === 'walk' || view === 'camera'
   inside = undefined
   $('camera').textContent = label
   document.body.classList.toggle('walking', view === 'walk')
@@ -356,8 +362,9 @@ function useCamera(id: string) {
   if (locked()) document.exitPointerLock()
   rememberWalk()
   // "plan:first" or "orbit:first" looks at that level and the ones below.
-  const [name, levelId] = id.split(':')
-  const camera = scene.cameras.find((c) => c.id === name)
+  // "room:kitchen" is one camera; "plan:first" is the plan of a level.
+  const [name, levelId] = id.startsWith('room:') ? [id, undefined] : id.split(':')
+  const camera = findCamera(scene, name)
   const wanted = levelIndexOf(levelId ?? camera?.level)
   if (name === 'plan' || camera?.type === 'plan') {
     active = plan
@@ -437,7 +444,7 @@ function beginWalk(at: Point, z: number, lookAt?: THREE.Vector3, label = 'walk')
 
 // Stand at a place the scene names, looking where its camera looks.
 function walkTo(id: string) {
-  const camera = scene?.cameras.find((c) => c.id === id)
+  const camera = scene ? findCamera(scene, id) : undefined
   if (!camera?.at || !camera.look) return
   beginWalk([camera.at[0], camera.at[1]], camera.at[2] - EYE, toWorld([camera.look[0], camera.look[1]], camera.look[2]), id)
 }
@@ -571,13 +578,14 @@ canvas.addEventListener('touchmove', (event) => {
 
 // The places a scene names, in file order, with the level each stands on.
 function places(): { id: string; name: string; level: number }[] {
-  return (scene?.cameras ?? [])
+  return (scene ? allCameras(scene) : [])
     .filter((c) => c.type === 'perspective' && c.at && c.look)
     .map((c) => ({ id: c.id, name: placeName(c.id), level: Math.max(0, levels.findIndex((l, i) => c.at![2] >= l.elevation - 0.3 && (!levels[i + 1] || c.at![2] < levels[i + 1].elevation - 0.3))) }))
 }
 
 function placeName(id: string): string {
-  return id.replace(/-view$/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+  const room = id.startsWith('room:')
+  return id.replace(/^room:/, '').replace(/-view$/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()) + (room ? ' (room)' : '')
 }
 
 // Next or previous place, around and around.
@@ -752,9 +760,9 @@ function escape(text: string): string {
 // ---- Loading and live updates ----------------------------------------------
 
 async function load(first: boolean): Promise<void> {
-  if (!scenePath) throw new Error('no scene: open this page with ?scene=/path/to/scene.json')
-  const response = await fetch(`./api/scene?path=${encodeURIComponent(scenePath)}`, { cache: 'no-store' })
-  const body = (await response.json()) as { scene?: unknown; error?: string }
+  const response = await fetch(bundled ? './scene.json' : `./api/scene?path=${encodeURIComponent(scenePath)}`, { cache: 'no-store' })
+  if (bundled && !response.ok) throw new Error('scene.json is missing beside this page')
+  const body: { scene?: unknown; error?: string } = bundled ? { scene: await response.json() } : await response.json()
   if (body.error) throw new Error(body.error)
   const result = check(body.scene)
   showProblems(result.problems)
@@ -775,7 +783,7 @@ async function load(first: boolean): Promise<void> {
   levels = levelsByElevation(next)
   if (cap !== Infinity && cap >= levels.length - 1) cap = Infinity
   planLevel = Math.min(planLevel, levels.length - 1)
-  built = buildScene(next, { fileUrl: (relative) => `./api/file?path=${encodeURIComponent(scenePath)}&file=${encodeURIComponent(relative)}` })
+  built = buildScene(next, { fileUrl: (relative) => (bundled ? `./files/${relative}` : `./api/file?path=${encodeURIComponent(scenePath)}&file=${encodeURIComponent(relative)}`) })
   world.add(built.root)
   shadowsChanged()
   // Compile every shader now, so the first turn of the head doesn't stall.
@@ -888,6 +896,7 @@ function renderStatus() {
 setInterval(() => !headless && renderStatus(), 1000)
 
 function listen() {
+  if (bundled) return
   if (!scenePath) return
   const events = new EventSource(`./api/events?path=${encodeURIComponent(scenePath)}`)
   events.addEventListener('change', () => load(false).catch((error) => setStatus(escape(String(error.message ?? error)))))
@@ -952,6 +961,53 @@ function frame() {
   }
 }
 
+// The built scene as one binary glTF, base64 in window.__stageGlb for
+// the command line to read: walls, floors, and furniture with their
+// materials; not the labels, drawings, or sky.
+async function exportGlb() {
+  if (!built) return
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js')
+  built.labels.visible = false
+  for (const overlay of built.overlays.values()) overlay.visible = false
+  const glb = (await new GLTFExporter().parseAsync(built.root, { binary: true, onlyVisible: true })) as ArrayBuffer
+  const bytes = new Uint8Array(glb)
+  let text = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000) as unknown as number[])
+  ;(window as unknown as { __stageGlb: string }).__stageGlb = btoa(text)
+}
+
+// Every camera named, as tiles with labels on one canvas: the contact
+// sheet behind `stage render --all-cameras`. Each tile is the renderer's
+// own size; the page is sized to the sheet by the renderer.
+function renderSheet(ids: string[]) {
+  const tileW = Number(params.get('w') ?? 640)
+  const tileH = Number(params.get('h') ?? 360)
+  const labelH = 28
+  const cols = Math.ceil(Math.sqrt(ids.length))
+  const rows = Math.ceil(ids.length / cols)
+  const sheet = document.createElement('canvas')
+  sheet.width = cols * tileW
+  sheet.height = rows * (tileH + labelH)
+  const context = sheet.getContext('2d')!
+  context.fillStyle = '#15171a'
+  context.fillRect(0, 0, sheet.width, sheet.height)
+  ids.forEach((id, i) => {
+    useCamera(id)
+    shadowsChanged()
+    frame()
+    frame()
+    const x = (i % cols) * tileW
+    const y = Math.floor(i / cols) * (tileH + labelH)
+    context.drawImage(renderer.domElement, x, y + labelH, tileW, tileH)
+    context.fillStyle = '#e8e6e1'
+    context.font = '600 15px system-ui, sans-serif'
+    context.fillText(id, x + 8, y + 19)
+  })
+  canvas.style.display = 'none'
+  sheet.style.cssText = 'display:block;position:fixed;left:0;top:0'
+  document.body.appendChild(sheet)
+}
+
 async function start() {
   try {
     // Each phase is recorded, so a render that times out says where it stopped.
@@ -965,6 +1021,14 @@ async function start() {
     await load(true)
     phase('sky')
     await applySky()
+    if (headless && params.has('export')) {
+      phase('models')
+      await settled()
+      phase('export')
+      await exportGlb()
+      document.body.dataset.ready = '1'
+      return
+    }
     if (headless) {
       phase('textures')
       await settled()
@@ -974,6 +1038,7 @@ async function start() {
       frame()
       await new Promise((resolve) => requestAnimationFrame(resolve))
       frame()
+      if (params.get('sheet')) renderSheet(params.get('sheet')!.split(',').filter(Boolean))
       document.body.dataset.ready = '1'
     } else {
       listen()

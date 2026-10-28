@@ -8,6 +8,7 @@ import { searchAssets } from '../src/core/assets.ts'
 import { check } from '../src/core/check.ts'
 import { distanceToSegment, walls, wallPieces } from '../src/core/geometry.ts'
 import { query } from '../src/core/query.ts'
+import { materialSpec } from '../src/core/materials.ts'
 import { format, readScene, writeScene } from '../src/core/store.ts'
 import { BODY_RADIUS, ground, obstacles, resolve } from '../src/core/walk.ts'
 
@@ -284,4 +285,66 @@ test('a sliding door lets a person through its open panels, not its closed ones'
   assert.ok(walk([3, 1], [0, -1], 100, blocking).at(-1)![1] < -0.5, 'through the open middle panel')
   assert.ok(walk([1.6, 1], [0, -1], 100, blocking).at(-1)![1] > 0, 'stopped by the closed panel')
   assert.ok(walk([0.5, 1], [0, -1], 100, blocking).at(-1)![1] > 0, 'stopped by the wall beside it')
+})
+
+// Space: what query knows about free floor, and what check says about
+// pieces in each other's way.
+
+test('query answers adjacency, areas, free space, and where a piece fits', async () => {
+  const scene = check(await example()).scene!
+  const next = query(scene, ['adjacent', 'living']) as any
+  assert.ok(next.neighbors.some((n: any) => n.room === 'kitchen' && n.sharedWall > 0 && n.connected), 'the living room opens to the kitchen')
+  const areas = query(scene, ['areas']) as any
+  assert.equal(areas.rooms.length, scene.rooms.length)
+  assert.ok(areas.indoor > 20)
+  const free = query(scene, ['free', 'living']) as any
+  assert.ok(free.clear > 0 && free.clear < free.area, 'some of the floor is clear, not all')
+  assert.ok(free.largestClearRectangle.width >= 1 && free.largestClearRectangle.depth >= 1)
+  const fit = query(scene, ['fits', 'chair/armchair', 'in', 'living']) as any
+  assert.ok(fit.fits && fit.places.length > 0)
+  for (const place of fit.places) assert.ok(scene.rooms.find((r) => r.id === 'living')!.floor && place.at.length === 2)
+  const noFit = query(scene, ['fits', 'table/dining-six', 'in', 'kitchen']) as any
+  assert.ok(Array.isArray(noFit.places))
+})
+
+test('check reports pieces that run into each other and wardrobes that cannot open', async () => {
+  const raw = await example()
+  raw.items.push({ id: 'sofa-2', asset: 'sofa/three-seat', room: 'living', at: raw.items.find((i: any) => i.id === 'sofa').at, facing: 0 })
+  const room = raw.rooms.find((r: any) => r.id === 'living')
+  // A wardrobe with its front 10 cm from the west wall, facing it.
+  raw.items.push({ id: 'wardrobe', asset: 'wardrobe/double', room: 'living', at: [room.floor[0][0] + 0.4, room.floor[0][1] + 2], facing: 270 })
+  const messages = check(raw).problems.map((p) => p.message)
+  assert.ok(messages.some((m) => /"sofa-2" runs into "sofa"/.test(m)), messages.join('\n'))
+  assert.ok(messages.some((m) => /"wardrobe" faces a wall/.test(m)), messages.join('\n'))
+})
+
+test('a stair under a floor without a well has no headroom', async () => {
+  const raw = await house()
+  // The first floor's stair hole becomes solid floor.
+  raw.rooms.find((r: any) => r.id === 'stair-1').well = false
+  const messages = check(raw).problems.map((p) => p.message)
+  assert.ok(messages.some((m) => /"stair-ground" has only .* m of headroom/.test(m)), messages.join('\n'))
+  assert.ok(!check(await house()).problems.some((p) => /headroom/.test(p.message)), 'with the well there is headroom')
+})
+
+test('a scene can carry its own materials', async () => {
+  const raw = await example()
+  raw.materials = [{ id: 'lime-plaster', color: '#e9e2d3', roughness: 0.9 }, { id: 'slate', color: '#4a4e55', texture: 'slate_floor_02', size: 1.2 }]
+  raw.rooms[0].materials = { ...raw.rooms[0].materials, walls: 'lime-plaster', floor: 'slate' }
+  const result = check(raw)
+  assert.ok(result.ok)
+  assert.ok(!result.problems.some((p) => /material "lime-plaster"|material "slate"/.test(p.message)), 'own materials are not unknown')
+  assert.deepEqual(materialSpec('lime-plaster', result.scene!.materials)?.color, '#e9e2d3')
+  assert.equal(materialSpec('slate', result.scene!.materials)?.size, 1.2)
+  assert.equal(materialSpec('oak-plank', result.scene!.materials)?.texture, 'laminate_floor_02', 'built-ins still resolve')
+  assert.ok(format(raw).lastIndexOf('"materials"') > format(raw).indexOf('"cameras"'), 'the materials list is written after the cameras')
+})
+
+test('a level can carry a gable roof', async () => {
+  const raw = await example()
+  raw.levels[0].roof = { kind: 'gable', pitch: 35 }
+  const result = check(raw)
+  assert.ok(result.ok, result.problems.map((p) => p.message).join('\n'))
+  assert.deepEqual(result.scene!.levels[0].roof, { kind: 'gable', pitch: 35, overhang: 0.4 })
+  assert.ok(/"roof": \{\s*"kind": "gable"/.test(format(raw)), 'the roof is written with its keys in order')
 })

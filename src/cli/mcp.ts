@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { searchAssets } from '../core/assets.ts'
 import { formatProblem, type CheckResult } from '../core/check.ts'
+import { allCameras } from '../core/cameras.ts'
 import { materialNames } from '../core/materials.ts'
 import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, type Collection } from '../core/schema.ts'
@@ -113,13 +114,16 @@ export async function runMcp(): Promise<void> {
         level: z.string().optional().describe('A level id: show it and the levels below it'),
         width: z.number().int().min(320).max(1920).default(1024),
         height: z.number().int().min(240).max(1080).default(640),
+        quality: z.enum(['high', 'fast']).optional().describe('fast skips ambient occlusion and shadows for a quick look'),
+        sheet: z.boolean().optional().describe('Every camera, plus one standing in each room, as one contact sheet of small tiles'),
       },
     },
-    ({ scene, camera, level, width, height }) =>
+    ({ scene, camera, level, width, height, quality, sheet }) =>
       guarded(async () => {
         const result = await checkScene(scene)
         if (!result.ok) return [text(`${problems(result)}\nfix the errors before rendering`)]
-        const png = await withRenderer((r) => r.render(resolve(scene), { camera, level, width, height }))
+        const cameras = sheet ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
+        const png = await withRenderer((r) => r.render(resolve(scene), { camera, level, quality, width: cameras ? 480 : width, height: cameras ? 270 : height, sheet: cameras }))
         return [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }, text(problems(result))]
       }),
   )
@@ -192,6 +196,23 @@ export async function runMcp(): Promise<void> {
       inputSchema: { words: z.string().default(''), category: z.string().optional() },
     },
     ({ words, category }) => guarded(async () => [text(searchAssets(words, { category }).map((a) => ({ id: a.id, name: a.name, size: a.size })))]),
+  )
+
+  server.registerTool(
+    'fetch_assets',
+    {
+      description: 'Download CC0 models and texture sets from Poly Haven into the local cache: everything the scene uses (its items with models, the textures of its own materials), or the ids given (asset ids like "chair/armchair", or Poly Haven ids). Renders show real models and photographed surfaces only once they are fetched.',
+      inputSchema: { scene: scenePath.optional(), ids: z.array(z.string()).optional() },
+    },
+    ({ scene, ids }) =>
+      guarded(async () => {
+        const { fetchAssets, sceneAssetIds } = await import('./assets.ts')
+        const wanted = [...(ids ?? [])]
+        if (scene) wanted.push(...sceneAssetIds((await checkScene(scene)).scene ?? { items: [] }))
+        const lines: string[] = []
+        await fetchAssets({ ids: wanted, log: (line) => lines.push(line) })
+        return [text(lines.length ? lines.join('\n') : 'nothing new to fetch')]
+      }),
   )
 
   server.registerTool('materials', { description: 'The built-in material names for floors, walls, and ceilings.', inputSchema: {} }, () =>

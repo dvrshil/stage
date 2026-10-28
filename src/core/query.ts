@@ -1,4 +1,5 @@
 import { findAsset } from './assets.ts'
+import { allCameras } from './cameras.ts'
 import { area, bounds, centroid, edges, levelsByElevation, pointInPolygon, roomHeight, sceneBounds, walls, type Point } from './geometry.ts'
 import type { Room, Scene } from './schema.ts'
 
@@ -58,7 +59,7 @@ export function query(scene: Scene, words: string[]): unknown {
         .map((o) => ({ id: o.id, type: o.type, room: o.wall.room, edge: o.wall.edge, at: o.at, width: o.width, height: o.height }))
     }
     case 'cameras':
-      return scene.cameras.map((c) => ({ id: c.id, type: c.type, at: c.at ?? null, look: c.look ?? null }))
+      return allCameras(scene).map((c) => ({ id: c.id, type: c.type, at: c.at ?? null, look: c.look ?? null, auto: c.id.startsWith('room:') }))
     case 'bounds': {
       const b = sceneBounds(scene)
       return { min: b.min, max: b.max, width: b.max[0] - b.min[0], depth: b.max[1] - b.min[1] }

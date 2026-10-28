@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { searchAssets } from '../core/assets.ts'
 import { formatProblem, type CheckResult } from '../core/check.ts'
+import { allCameras } from '../core/cameras.ts'
 import { materialNames } from '../core/materials.ts'
 import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, jsonSchema, type Collection } from '../core/schema.ts'
@@ -26,14 +27,17 @@ Commands that need no display:
   new <path> [--name N] [--from flat]  Start a scene, empty or from an example
   check <scene>                        Report every problem, with its entity and a fix
   render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]
+                                       [--all-cameras: every camera, and one per room, as a contact sheet]
                                        Cameras: orbit, plan, plan:<level>, or a camera id
   query <scene> <question...>          ${QUESTIONS.join(' | ')}
   set <scene> <collection> '<json>'    Add an entity, or replace the one with its id
   remove <scene> <id>                  Remove an entity
   show <scene> [--camera id] [--level id] [--focus id]
                                        Point every open viewer at a camera, level, or entity
+  export <scene> -o scene.glb          Write the built scene as binary glTF
+  share <scene> -o folder              Bundle viewer, scene, and assets for any static host
   assets [words...] [--category c]     Search the asset library
-  assets fetch [ids...] [--all]        Download CC0 textures, models and the sky into the local cache
+  assets fetch [ids|scene.json...] [--all]  Download CC0 textures, models and the sky into the local cache
   materials                            List the built-in materials
   fmt <scene>                          Rewrite the scene in canonical form
   schema                               Print the scene format as JSON Schema
@@ -79,6 +83,7 @@ async function main(argv: string[]): Promise<number> {
       port: { type: 'string' },
       resolution: { type: 'string' },
       all: { type: 'boolean' },
+      'all-cameras': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   })
@@ -125,7 +130,8 @@ async function main(argv: string[]): Promise<number> {
       }
       const renderer = await Renderer.start()
       try {
-        const png = await renderer.render(scene, { camera: values.camera as string | undefined, level: values.level as string | undefined, width, height })
+        const sheet = values['all-cameras'] === true ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
+        const png = await renderer.render(scene, { camera: values.camera as string | undefined, level: values.level as string | undefined, width: sheet && !values.size ? 640 : width, height: sheet && !values.size ? 360 : height, sheet })
         const target = resolve(out)
         mkdirSync(dirname(target), { recursive: true })
         const temporary = `${target}.${process.pid}.tmp`
@@ -193,8 +199,13 @@ async function main(argv: string[]): Promise<number> {
 
     case 'assets': {
       if (positionals[0] === 'fetch') {
-        const { fetchAssets, CACHE } = await import('./assets.ts')
-        const lock = await fetchAssets({ resolution: values.resolution as string | undefined, ids: positionals.slice(1), all: values.all === true, log: json ? undefined : (line) => print(line) })
+        const { fetchAssets, sceneAssetIds, CACHE } = await import('./assets.ts')
+        const ids: string[] = []
+        for (const arg of positionals.slice(1)) {
+          if (arg.endsWith('.json')) ids.push(...sceneAssetIds((await checkScene(arg)).scene ?? { items: [] }))
+          else ids.push(arg)
+        }
+        const lock = await fetchAssets({ resolution: values.resolution as string | undefined, ids, all: values.all === true, log: json ? undefined : (line) => print(line) })
         json ? print({ ok: true, cache: CACHE, textures: Object.keys(lock.textures), skies: Object.keys(lock.skies), models: Object.keys(lock.models) }) : print(`Fetched into ${CACHE}`)
         return 0
       }
@@ -207,6 +218,41 @@ async function main(argv: string[]): Promise<number> {
     case 'materials':
       json ? print(materialNames()) : print(materialNames().join('\n'))
       return 0
+
+    case 'export': {
+      if (!scene) return fail('name a scene: stage export <scene> -o scene.glb')
+      const out = (values.out as string | undefined) ?? 'scene.glb'
+      const result = await checkScene(scene)
+      if (!result.ok) {
+        reportCheck(result, json)
+        return fail('fix the errors above before exporting')
+      }
+      const renderer = await Renderer.start()
+      try {
+        const glb = await renderer.export(resolve(scene))
+        const target = resolve(out)
+        mkdirSync(dirname(target), { recursive: true })
+        await writeFile(target, glb)
+        json ? print({ ok: true, file: target, bytes: glb.length }) : print(`Exported ${target} (${(glb.length / 1e6).toFixed(1)} MB)`)
+      } finally {
+        await renderer.close()
+      }
+      return 0
+    }
+
+    case 'share': {
+      if (!scene) return fail('name a scene: stage share <scene> -o folder')
+      const out = (values.out as string | undefined) ?? `${scene.replace(/\.json$/, '')}-site`
+      const result = await checkScene(scene)
+      if (!result.ok) {
+        reportCheck(result, json)
+        return fail('fix the errors above before sharing')
+      }
+      const { shareScene } = await import('./share.ts')
+      const info = await shareScene(scene, result.scene!, out, (line) => !json && print(line))
+      json ? print({ ok: true, ...info }) : print(`Wrote ${info.files} files (${(info.bytes / 1e6).toFixed(1)} MB) to ${info.dir}\nServe the folder from any static host, or try: python3 -m http.server -d ${info.dir} 8080`)
+      return 0
+    }
 
     case 'fmt': {
       if (!scene) return fail('name a scene: stage fmt <scene>')

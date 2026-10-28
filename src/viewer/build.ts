@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { alongWall, area, bounds, centroid, distanceToSegment, levelsByElevation, pointInPolygon, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
 import { FIXTURES, findAsset } from '../core/assets.ts'
-import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
+import { DEFAULT_MATERIALS, MATERIALS, materialSpec } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { RAIL_OFFSET, sliderLayout } from '../core/slider.ts'
 import { floorToFloor } from '../core/walk.ts'
@@ -22,8 +22,21 @@ const FIXTURE = new THREE.MeshStandardMaterial({ color: '#fffaf0', emissive: '#f
 
 // A photographed texture set, when downloaded. Every surface carries UVs
 // in meters, so it lands at the size Poly Haven measured.
+// The scene's own materials, set before each build; name lookups try
+// them first.
+let custom: Scene['materials'] = []
+export function useCustomMaterials(materials: Scene['materials']): void {
+  const changed = JSON.stringify(materials) !== JSON.stringify(custom)
+  custom = materials
+  if (changed) {
+    materialCache.clear()
+    floorCache.clear()
+  }
+}
+const spec = (name: string | undefined) => materialSpec(name, custom)
+
 function photographed(spec: (typeof MATERIALS)[string]): THREE.MeshStandardMaterial | undefined {
-  const set = textureSet(spec.texture)
+  const set = textureSet(spec.texture, spec.size)
   if (!set) return undefined
   return new THREE.MeshStandardMaterial({
     // Paint keeps its own color: only the plaster's relief and sheen show
@@ -43,11 +56,11 @@ function photographed(spec: (typeof MATERIALS)[string]): THREE.MeshStandardMater
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>()
 export function material(name: string | undefined, fallback: string): THREE.MeshStandardMaterial {
-  const key = name && MATERIALS[name] ? name : fallback
+  const key = name && spec(name) ? name : fallback
   let m = materialCache.get(key)
   if (!m) {
-    const spec = MATERIALS[key]
-    m = photographed(spec) ?? new THREE.MeshStandardMaterial({ color: spec.color, roughness: spec.roughness, metalness: spec.metalness ?? 0 })
+    const s = spec(key) ?? MATERIALS[fallback]
+    m = photographed(s) ?? new THREE.MeshStandardMaterial({ color: s.color, roughness: s.roughness, metalness: s.metalness ?? 0 })
     materialCache.set(key, m)
   }
   return m
@@ -57,17 +70,17 @@ export function material(name: string | undefined, fallback: string): THREE.Mesh
 // from both sides, so a terrace over an open porch has an underside.
 const floorCache = new Map<string, THREE.MeshStandardMaterial>()
 export function floorMaterial(name: string | undefined, fallback = DEFAULT_MATERIALS.floor): THREE.MeshStandardMaterial {
-  const key = name && MATERIALS[name] ? name : fallback
+  const key = name && spec(name) ? name : fallback
   let m = floorCache.get(key)
   if (m) return m
-  const spec = MATERIALS[key]
-  m = photographed(spec)
+  const chosen = materialSpec(key, custom) ?? MATERIALS[fallback]
+  m = photographed(chosen)
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ roughness: spec.roughness, metalness: spec.metalness ?? 0 })
-    if (spec.pattern === 'planks') m.map = planks(spec.color)
-    else if (spec.pattern === 'tiles') m.map = tiles(spec.color, spec.tile ?? 0.6)
-    else if (spec.pattern === 'speckle') m.map = speckle(spec.color, 1)
-    else m.color.set(spec.color)
+    m = new THREE.MeshStandardMaterial({ roughness: chosen.roughness, metalness: chosen.metalness ?? 0 })
+    if (chosen.pattern === 'planks') m.map = planks(chosen.color)
+    else if (chosen.pattern === 'tiles') m.map = tiles(chosen.color, chosen.tile ?? 0.6)
+    else if (chosen.pattern === 'speckle') m.map = speckle(chosen.color, 1)
+    else m.color.set(chosen.color)
   }
   m.side = THREE.DoubleSide
   floorCache.set(key, m)
@@ -93,6 +106,8 @@ export interface Built {
   // Every entity's objects by id, for highlighting and focusing.
   entities: Map<string, THREE.Object3D>
   labels: THREE.Group
+  // Gable roofs, shown while walking and from cameras, never from above.
+  roofs: THREE.Object3D[]
   // Ceilings and their lights: shown at eye level, hidden in the overviews
   // so a person can see into every room from above.
   indoor: THREE.Object3D[]
@@ -115,12 +130,14 @@ function floorShape(floor: Point[]): THREE.Shape {
 }
 
 export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
+  useCustomMaterials(scene.materials)
   const root = new THREE.Group()
   const labels = new THREE.Group()
   const entities = new Map<string, THREE.Object3D>()
   const indoor: THREE.Object3D[] = []
   const overlays = new Map<string, THREE.Object3D>()
   const fixtures: Built['fixtures'] = []
+  const roofs: THREE.Object3D[] = []
   root.add(labels)
   const levels = levelsByElevation(scene)
   const levelIndex = (id: string) => Math.max(0, levels.findIndex((l) => l.id === id))
@@ -214,11 +231,52 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
     }
 
     const [cx, cy] = centroid(room.floor)
-    const label = textSprite(room.name ?? room.id, 0.05, 0.42)
+    const extent = bounds(room.floor)
+    const label = textSprite(`${room.name ?? room.id}  ${(extent.max[0] - extent.min[0]).toFixed(1)} × ${(extent.max[1] - extent.min[1]).toFixed(1)} m`, 0.05, 0.42)
     label.position.copy(toWorld([cx, cy], elevation + 0.05))
     label.userData.room = room.id
     label.userData.level = group.userData.level
     labels.add(label)
+  }
+
+  // A gable roof over a level's closed rooms: a triangular profile
+  // extruded along the ridge, tiles on the slopes, the house's skin on the
+  // gable ends. Shown only from outside and while walking, like openings.
+  for (const level of levels) {
+    if (level.roof?.kind !== 'gable') continue
+    const covered = scene.rooms.filter((r) => r.level === level.id && !r.open && !r.well)
+    if (covered.length === 0) continue
+    const box = bounds(covered.flatMap((r) => r.floor))
+    const over = level.roof.overhang
+    const minX = box.min[0] - over
+    const maxX = box.max[0] + over
+    const minY = box.min[1] - over
+    const maxY = box.max[1] + over
+    const alongX = maxX - minX >= maxY - minY
+    const span = alongX ? maxY - minY : maxX - minX
+    const length = alongX ? maxX - minX : maxY - minY
+    const rise = (span / 2) * Math.tan((level.roof.pitch * Math.PI) / 180)
+    const profile = new THREE.Shape([new THREE.Vector2(-span / 2, 0), new THREE.Vector2(span / 2, 0), new THREE.Vector2(0, rise)])
+    const geometry = new THREE.ExtrudeGeometry(profile, { depth: length, bevelEnabled: false })
+    const roof = new THREE.Mesh(geometry, [material(DEFAULT_MATERIALS.exterior, DEFAULT_MATERIALS.exterior), floorMaterial('roof-tile', 'roof-tile')])
+    // The profile stands in x/y and extrudes along +z; turn that along the
+    // ridge, eaves at the top of the walls.
+    const eaves = level.elevation + level.height + 0.02
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    if (alongX) {
+      roof.rotation.y = Math.PI / 2
+      roof.position.copy(toWorld([minX, cy], eaves))
+    } else {
+      roof.position.copy(toWorld([cx, maxY], eaves))
+    }
+    roof.castShadow = true
+    roof.receiveShadow = true
+    roof.userData.roof = true
+    roof.userData.level = levelIndex(level.id)
+    roofs.push(roof)
+    const home = entities.get(covered[0].id)
+    if (home) home.add(roof)
   }
 
   // The drawing under each level, for the plan view.
@@ -298,7 +356,7 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
     }
   }
 
-  return { root, entities, labels, indoor, overlays, fixtures, sun }
+  return { root, entities, labels, roofs, indoor, overlays, fixtures, sun }
 }
 
 // Where a room's ceiling lights go: its center, or a grid about 4.5 m
@@ -444,7 +502,7 @@ export function applyCutaway(root: THREE.Object3D, camera: THREE.Camera, outside
     if (mode === 'hidden') continue
     for (const child of group.children) {
       const cut = child.userData.cutaway as { bottom: number; top: number; base: number } | undefined
-      if (child.userData.opening) {
+      if (child.userData.opening || child.userData.roof) {
         child.visible = mode === 'full'
         continue
       }

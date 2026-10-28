@@ -41,7 +41,7 @@ function order(value: unknown, kind = 'scene'): unknown {
   const sorted = [...keys.filter((k) => k in object), ...Object.keys(object).filter((k) => !keys.includes(k))]
   const out: Record<string, unknown> = {}
   for (const key of sorted) {
-    const childKind = kind === 'scene' ? singular(key) : key === 'wall' || key === 'materials' || key === 'plan' ? key : kind
+    const childKind = kind === 'scene' ? singular(key) : key === 'wall' || key === 'materials' || key === 'plan' || key === 'roof' ? key : kind
     out[key] = order(object[key], childKind)
   }
   return out
