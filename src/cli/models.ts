@@ -247,6 +247,13 @@ const sketchfab: ModelSource = {
     if (!archive) throw new Error(`${hit.id}: Sketchfab offered no glTF archive`)
     const { data } = await getBytes(archive.url)
     const base = join('models', 'sketchfab', `${slug(hit.name)}-${hit.id.slice(0, 8)}`)
+    // The glb comes bare; the glTF comes zipped with its files.
+    if (data.length > 4 && data.toString('ascii', 0, 4) === 'glTF') {
+      const file = `${base}.glb`
+      mkdirSync(dirname(join(folder, file)), { recursive: true })
+      await writeFile(join(folder, file), data)
+      return file
+    }
     const entries = unzip(data)
     let main: string | undefined
     for (const entry of entries) {
