@@ -223,16 +223,19 @@ const sketchfab: ModelSource = {
   searchWithoutKey: true,
   headers: (): Record<string, string> => (process.env.SKETCHFAB_TOKEN ? { authorization: `Token ${process.env.SKETCHFAB_TOKEN}` } : {}),
   async search(words, limit, { license }) {
-    const licenses = license === 'cc0' ? ['cc0'] : ['cc0', 'by']
-    const pages = await Promise.all(licenses.map((l) => getJson(`https://api.sketchfab.com/v3/search?type=models&q=${encodeURIComponent(words)}&downloadable=true&license=${l}&count=${Math.min(24, limit)}&archives_max_face_count=500000`).catch(() => ({ results: [] }))))
-    const seen = new Set<string>()
+    // One relevance-ranked search over everything downloadable, then only
+    // the licenses that allow use with credit; a license filter on the
+    // query itself makes Sketchfab rank loosely within that license.
+    const allowed = license === 'cc0' ? new Set(['cc0']) : new Set(['cc0', 'by', 'by-sa'])
     const hits: ModelHit[] = []
-    for (const page of pages) {
-      for (const m of (page.results ?? []) as any[]) {
-        if (seen.has(m.uid)) continue
-        seen.add(m.uid)
+    let url: string | undefined = `https://api.sketchfab.com/v3/search?type=models&q=${encodeURIComponent(words)}&downloadable=true${license === 'cc0' ? '&license=cc0' : ''}&count=24&archives_max_face_count=500000`
+    for (let page = 0; page < 3 && url && hits.length < limit; page++) {
+      const data: any = await getJson(url).catch(() => ({ results: [] }))
+      for (const m of (data.results ?? []) as any[]) {
+        if (!allowed.has(m.license?.uid ?? m.license?.slug ?? '') && !/cc0|attribution$|attribution-sharealike$/i.test(m.license?.label ?? '')) continue
         hits.push(sketchfabHit(m))
       }
+      url = data.next
     }
     return hits.slice(0, limit)
   },
@@ -403,7 +406,9 @@ export async function thumbnailImage(hit: ModelHit): Promise<{ data: string; mim
   if (!hit.thumbnail) return undefined
   try {
     const { data, type } = await getBytes(hit.thumbnail, SOURCES.find((s) => s.id === hit.source)?.headers?.() ?? {})
-    const mimeType = type.split(';')[0].trim()
+    // Some hosts send pictures as octet streams; the bytes say what they are.
+    const sniffed = data.length > 12 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP' ? 'image/webp' : data[0] === 0x89 && data.toString('ascii', 1, 4) === 'PNG' ? 'image/png' : data[0] === 0xff && data[1] === 0xd8 ? 'image/jpeg' : undefined
+    const mimeType = sniffed ?? type.split(';')[0].trim()
     if (!mimeType.startsWith('image/')) return undefined
     return { data: data.toString('base64'), mimeType }
   } catch {

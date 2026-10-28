@@ -25,9 +25,10 @@ stands in rooms, levels stack. A scene with no rooms is fine.
 
 ## Start
 
-- A new scene: `new_scene` (from an example when the person wants something
-  to react to), then `open_viewer` right away so they watch it take shape.
-  With no path given, use `~/stage-scenes/<name>/scene.json`.
+- A new scene: `new_scene` (`empty` for a thing, `room` for a building,
+  or an example when the person wants something to react to), then
+  `open_viewer` right away so they watch it take shape. With no path
+  given, use `~/stage-scenes/<name>/scene.json`.
 - An existing scene: `check` it, then `query "rooms"` and `query "objects"`
   for the lay of the land. `read_scene` only when you must; `query` is
   cheaper.

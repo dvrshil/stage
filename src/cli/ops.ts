@@ -32,20 +32,23 @@ export async function newScene(path: string, name: string, from = 'empty'): Prom
   const target = resolve(path.endsWith('.json') ? path : join(path, 'scene.json'))
   if (existsSync(target)) throw new Error(`${target} already exists; open it, or pick another path`)
   mkdirSync(dirname(target), { recursive: true })
-  if (from !== 'empty') {
+  if (from !== 'empty' && from !== 'room') {
     const example = join(EXAMPLES, from, 'scene.json')
-    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, two-storey, desk, or empty`)
+    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, two-storey, desk, room, or empty`)
     await copyFile(example, target)
     return target
   }
+  // Empty is the ground and the sun, nothing else: a thing can be built
+  // with no building around it. "room" starts a building instead.
   await writeScene(target, {
     stage: '0.1',
     name,
     units: 'm',
     levels: [{ id: 'ground', elevation: 0, height: 2.7 }],
-    rooms: [{ id: 'room', level: 'ground', name: 'Room', floor: [[0, 0], [4, 0], [4, 3], [0, 3]] }],
-    openings: [{ id: 'door', wall: { room: 'room', edge: 0 }, at: 0.5, type: 'door', width: 0.9, height: 2.1 }],
+    rooms: from === 'room' ? [{ id: 'room', level: 'ground', name: 'Room', floor: [[0, 0], [4, 0], [4, 3], [0, 3]] }] : [],
+    openings: from === 'room' ? [{ id: 'door', wall: { room: 'room', edge: 0 }, at: 0.5, type: 'door', width: 0.9, height: 2.1 }] : [],
     items: [],
+    objects: [],
     lights: [{ id: 'sun', type: 'sun', azimuth: 220, elevation: 35, intensity: 1 }],
     cameras: [{ id: 'plan', type: 'plan' }],
   })

@@ -120,8 +120,8 @@ export async function runMcp(): Promise<void> {
     'new_scene',
     {
       title: 'New scene',
-      description: `Start a scene file: "empty" is one 4 × 3 m room with a door; the examples are ${EXAMPLE_NAMES.map((n) => `"${n}" (${EXAMPLE_BLURB[n]})`).join(', ')}. Refuses to overwrite. When the person named no path, use ~/stage-scenes/<name>/scene.json. Follow with open_viewer so they watch it take shape.`,
-      inputSchema: { path: scenePath, name: z.string().default('Untitled scene'), from: z.enum(['empty', ...EXAMPLE_NAMES]).default('empty') },
+      description: `Start a scene file: "empty" is the ground and the sun with nothing on it, for a thing built from objects; "room" is one 4 × 3 m room with a door, for a building; the examples are ${EXAMPLE_NAMES.map((n) => `"${n}" (${EXAMPLE_BLURB[n]})`).join(', ')}. Refuses to overwrite. When the person named no path, use ~/stage-scenes/<name>/scene.json. Follow with open_viewer so they watch it take shape.`,
+      inputSchema: { path: scenePath, name: z.string().default('Untitled scene'), from: z.enum(['empty', 'room', ...EXAMPLE_NAMES]).default('empty') },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     ({ path, name, from }) => guarded(async () => [text({ scene: await newScene(path, name, from) })]),
@@ -157,7 +157,7 @@ export async function runMcp(): Promise<void> {
     'check',
     {
       title: 'Check the scene',
-      description: 'Validate the scene: schema, references, and spatial rules (doors that do not fit their wall, pieces that run into each other, wardrobes with no room to open, things standing on windows, stairs without headroom, rooms that overlap). Every problem names the entity and how to fix it. Errors stop renders; warnings do not.',
+      description: 'Validate the scene: schema, references, and spatial rules (objects or pieces that run into each other, a parent that is missing or loops, doors that do not fit their wall, wardrobes with no room to open, things standing on windows, stairs without headroom, rooms that overlap). Every problem names the entity and how to fix it. Errors stop renders; warnings do not.',
       inputSchema: { scene: scenePath },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -274,7 +274,7 @@ export async function runMcp(): Promise<void> {
     'assets',
     {
       title: 'Search the library',
-      description: `Search the furniture and fixture library (${ASSETS.length} CC0 pieces) by words that must all match, or by category: ${categories.join(', ')}. Sizes are width × depth × height in meters at facing 0; the front of a piece faces north at facing 0. Empty words list everything in a category. A piece not in the library can still be placed with a "size" and shows as a labeled box.`,
+      description: `Search the built-in library (${ASSETS.length} CC0 pieces: furniture, fixtures, plants, people, vehicles) by words that must all match, or by category: ${categories.join(', ')}. A piece goes in a room as an item, or anywhere as an object of kind "asset". Sizes are width × depth × height in meters at facing 0; the front of a piece faces north at facing 0. Empty words list everything in a category. For anything else, find_model searches the open libraries. A piece not in the library can still be placed with a "size" and shows as a labeled box.`,
       inputSchema: { words: z.string().default(''), category: z.enum(categories as [string, ...string[]]).optional() },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

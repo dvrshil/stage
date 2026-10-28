@@ -148,7 +148,7 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 
 | Command | Does |
 | --- | --- |
-| `stage new <path> [--from flat]` | Start a scene, empty or from an example |
+| `stage new <path> [--from flat]` | Start a scene: empty, `room`, or an example |
 | `stage check <scene>` | Schema, references, and spatial rules |
 | `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor, `room:<id>` for a camera standing in any room |
 | `stage render <scene> --camera object:duck:front -o duck.png` | Framed on any object, item, or room: `:front`, `:back`, `:left`, `:right`, `:top`, the corners, a bearing, and `:close` |

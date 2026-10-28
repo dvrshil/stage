@@ -6,13 +6,15 @@ viewer, one command line, and an MCP server over the same operations.
 ## Where things live
 
 - `src/core`: everything that needs no renderer. The schema (`schema.ts`),
-  walls and geometry (`geometry.ts`), the rules (`check.ts`), the questions
-  (`query.ts`), walking (`walk.ts`), the library (`assets.ts`,
-  `generated-assets.ts`), materials, cameras, and the file store.
+  free objects and their placement (`objects.ts`), walls and geometry
+  (`geometry.ts`), the rules (`check.ts`), the questions (`query.ts`),
+  walking (`walk.ts`), framing cameras (`cameras.ts`), the library
+  (`assets.ts`, `generated-assets.ts`), materials, and the file store.
 - `src/viewer`: the browser page, drawn with Three.js and bundled by Vite.
   `build.ts` turns a scene into meshes; `main.ts` is the page.
 - `src/cli`: the commands (`index.ts`), the live server, headless renders,
-  asset fetching, share bundles, and the MCP server (`mcp.ts`).
+  asset fetching, the open model libraries (`models.ts`, one adapter per
+  source), share bundles, and the MCP server (`mcp.ts`).
 - `src/skill.md`: the agent guide. The MCP server sends it as its
   instructions, and `stage skill install` installs it as a skill. Change it
   when the format or the order of work changes.

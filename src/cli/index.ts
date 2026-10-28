@@ -24,7 +24,7 @@ Viewer:
   serve [--port ${DEFAULT_PORT}]                   Run the viewer server in the foreground
 
 Commands that need no display:
-  new <path> [--name N] [--from flat]  Start a scene, empty or from an example
+  new <path> [--name N] [--from flat]  Start a scene: empty, room, or an example (flat, flat-with-bedroom, two-storey, desk)
   check <scene>                        Report every problem, with its entity and a fix
   render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]
                                        [--all-cameras: every camera, and one per room, as a contact sheet]
