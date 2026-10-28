@@ -105,15 +105,17 @@ export function frameCamera(scene: Scene, spec: string): Camera | undefined {
   const { box, yaw } = target
   const center = [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2]
   const radius = Math.max(0.05, Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) / 2)
-  // Fill the frame: the box's half diagonal at the edge of the vertical
-  // field of view, with a little air around it.
-  const distance = (radius / Math.tan((FRAME_FOV * Math.PI) / 360)) * (close ? 0.9 : 1.25)
+  // Fill the frame: the box's half diagonal inside the vertical field of
+  // view with air around it, so the top and the bottom are both in the
+  // picture whatever the angle; `close` leaves less air. Side views look
+  // down a little, so the top of the thing shows as well as its side.
+  const distance = (radius / Math.tan((FRAME_FOV * Math.PI) / 360)) * (close ? 1.1 : 1.5)
   let bearing: number
   let elevation: number
-  if (angle === undefined) [bearing, elevation] = [yaw - 35, 22]
+  if (angle === undefined) [bearing, elevation] = [yaw - 35, 28]
   else if (angle === 'top') [bearing, elevation] = [yaw, 84]
-  else if ((ANGLES as readonly string[]).includes(angle)) [bearing, elevation] = [yaw + OFFSETS[angle as (typeof ANGLES)[number]], 15]
-  else if (/^-?\d+(\.\d+)?$/.test(angle)) [bearing, elevation] = [Number(angle), 20]
+  else if ((ANGLES as readonly string[]).includes(angle)) [bearing, elevation] = [yaw + OFFSETS[angle as (typeof ANGLES)[number]], 24]
+  else if (/^-?\d+(\.\d+)?$/.test(angle)) [bearing, elevation] = [Number(angle), 24]
   else return undefined
   const b = (bearing * Math.PI) / 180
   const e = (elevation * Math.PI) / 180

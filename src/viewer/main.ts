@@ -301,7 +301,18 @@ function planLabel(): string {
 
 // What each view shows: ceilings and room lights inside, room labels and
 // the dollhouse cutaway from above.
+// Labels float over the things they name; in a picture framed on one
+// thing they would cover it, so they step aside for those views.
+function applyLabelVisibility(view: View, label: string) {
+  if (!built) return
+  const inspecting = view === 'camera' && label.startsWith('camera: object:')
+  built.root.traverse((o) => {
+    if (o.userData.objectLabel) o.visible = !inspecting
+  })
+}
+
 function applyView(next: View, label: string) {
+  applyLabelVisibility(next, label)
   view = next
   if (built) built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
   if (built) for (const roof of built.roofs) roof.visible = view === 'walk' || view === 'camera'

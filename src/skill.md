@@ -83,7 +83,8 @@ stands in rooms, levels stack. A scene with no rooms is fine.
 - `solid` (default true) stops a person and counts in the overlap check;
   parts of one assembly may touch. Every flat top within a step is
   something to stand on; a `plane` is only that, never in the way.
-- `label` floats text above it, for a scene that explains itself.
+- `label` floats text above it, for a scene that explains itself. Labels
+  step aside in `object:` views, so they never cover the thing inspected.
 - `room` stands it on that room's floor; without one, z counts from the
   ground. With no rooms at all, the ground holds the person up.
 - `query "objects"` lists every object with its world position, yaw and

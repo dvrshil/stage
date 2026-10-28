@@ -459,6 +459,7 @@ function buildObjects(scene: Scene, root: THREE.Group, entities: Map<string, THR
       const sprite = textSprite(object.label, 0, 0.11)
       sprite.position.y = Math.max(0.1, top / Math.max(1e-6, scale[2]) + 0.12)
       sprite.scale.multiplyScalar(1 / Math.max(scale[0], scale[1], scale[2]))
+      sprite.userData.objectLabel = true
       group.add(sprite)
     }
   }
