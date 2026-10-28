@@ -104,12 +104,6 @@ export function frameCamera(scene: Scene, spec: string): Camera | undefined {
   const angle = rest.find((r) => r !== 'close')
   const { box, yaw } = target
   const center = [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2]
-  const radius = Math.max(0.05, Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) / 2)
-  // Fill the frame: the box's half diagonal inside the vertical field of
-  // view with air around it, so the top and the bottom are both in the
-  // picture whatever the angle; `close` leaves less air. Side views look
-  // down a little, so the top of the thing shows as well as its side.
-  const distance = (radius / Math.tan((FRAME_FOV * Math.PI) / 360)) * (close ? 1.1 : 1.5)
   let bearing: number
   let elevation: number
   if (angle === undefined) [bearing, elevation] = [yaw - 35, 28]
@@ -119,8 +113,29 @@ export function frameCamera(scene: Scene, spec: string): Camera | undefined {
   else return undefined
   const b = (bearing * Math.PI) / 180
   const e = (elevation * Math.PI) / 180
+  // The way from the center to the camera, and the frame's up and right.
+  const f = [Math.sin(b) * Math.cos(e), Math.cos(b) * Math.cos(e), Math.sin(e)]
+  const dot = (p: number[], q: number[]) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2]
+  const upRaw = [-f[0] * f[2], -f[1] * f[2], 1 - f[2] * f[2]]
+  const upLength = Math.hypot(...upRaw) || 1
+  const u = upRaw.map((n) => n / upLength)
+  const r = [u[1] * f[2] - u[2] * f[1], u[2] * f[0] - u[0] * f[2], u[0] * f[1] - u[1] * f[0]]
+  // Fill the frame: the nearest distance at which every corner of the box
+  // is inside the field of view, tall and wide, for a 16:9 picture, with
+  // some air around it; `close` leaves almost none. The top and the bottom
+  // are in the picture from every side, and a wide thing fills it as well
+  // as a tall one.
+  const tanV = Math.tan((FRAME_FOV * Math.PI) / 360)
+  const tanH = tanV * (16 / 9)
+  let distance = 0.3
+  for (const x of [box.min[0], box.max[0]]) for (const y of [box.min[1], box.max[1]]) for (const z of [box.min[2], box.max[2]]) {
+    const c = [x - center[0], y - center[1], z - center[2]]
+    const toward = dot(c, f)
+    distance = Math.max(distance, Math.abs(dot(c, u)) / tanV + toward, Math.abs(dot(c, r)) / tanH + toward)
+  }
+  distance *= close ? 1.04 : 1.18
   const round = (n: number) => Math.round(n * 1000) / 1000
-  const at: [number, number, number] = [center[0] + Math.sin(b) * Math.cos(e) * distance, center[1] + Math.cos(b) * Math.cos(e) * distance, Math.max(0.15, center[2] + Math.sin(e) * distance)]
+  const at: [number, number, number] = [center[0] + f[0] * distance, center[1] + f[1] * distance, Math.max(0.15, center[2] + f[2] * distance)]
   return { id: spec, type: 'perspective', at: at.map(round) as [number, number, number], look: center.map(round) as [number, number, number], fov: FRAME_FOV }
 }
 
