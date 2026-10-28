@@ -272,6 +272,41 @@ function spatial(scene: Scene): Problem[] {
     })
   })
 
+  // A wardrobe or a wall TV placed on a window covers it.
+  scene.openings.forEach((opening) => {
+    if (opening.type !== 'window') return
+    const room = rooms.get(opening.wall.room)
+    const edge = room && edges(room)[opening.wall.edge]
+    if (!room || !edge || edge.length === 0) return
+    const ux = (edge.b[0] - edge.a[0]) / edge.length
+    const uy = (edge.b[1] - edge.a[1]) / edge.length
+    const center: Point = [edge.a[0] + ux * (opening.at + opening.width / 2), edge.a[1] + uy * (opening.at + opening.width / 2)]
+    const floor = roomElevation(scene, room)
+    const sill = opening.sill ?? DEFAULT_SILL
+    scene.items.forEach((item, index) => {
+      const info = findAsset(item.asset)
+      // Low pieces and things that belong under a window are fine there.
+      if (['railing', 'plant', 'lamp', 'chair', 'seating', 'sofa', 'bench', 'bed', 'table', 'stairs', 'rug'].includes(info?.category ?? '')) return
+      const size = info && !info.resizable ? info.size : (item.size ?? info?.size)
+      if (!size) return
+      const itemRoom = rooms.get(item.room)
+      if (itemRoom && roomElevation(scene, itemRoom) !== floor) return
+      const base = (itemRoom ? roomElevation(scene, itemRoom) : 0) + item.elevation
+      // Only pieces that rise above the sill and stand against the wall.
+      if (base + size[2] * item.scale < floor + sill + 0.3 || base > floor + sill + opening.height) return
+      const halfD = (size[1] * item.scale) / 2
+      const zone = { x: center[0], y: center[1], halfW: opening.width / 2, halfD: 0.3, angle: Math.atan2(uy, ux) }
+      const box = { x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2, halfD, angle: (-item.facing * Math.PI) / 180 }
+      if (!rectanglesOverlap(zone, box)) return
+      problems.push({
+        severity: 'warning',
+        path: `items.${index}.at`,
+        entity: item.id,
+        message: `"${item.id}" stands against window "${opening.id}" (${opening.wall.room}, edge ${opening.wall.edge}) and covers it; move one of them along the wall.`,
+      })
+    })
+  })
+
   scene.items.forEach((item, index) => {
     const room = rooms.get(item.room)
     if (!room) return

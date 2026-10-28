@@ -51,6 +51,9 @@ export const Room = z.object({
   // A well has no floor: the hole a stair comes up through, or a void over
   // a tall room below.
   well: z.boolean().default(false),
+  // Walls of this room are at least this thick (m), even where another room
+  // shares them: a lift shaft, or a hall that borrows a house's outside wall.
+  thickness: z.number().min(0.05).optional(),
   // No ceiling: a stairwell under a well, or a room open to the one above.
   ceiling: z.boolean().default(true),
   materials: z
@@ -141,7 +144,7 @@ export const KEY_ORDER: Record<string, string[]> = {
   scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'lights', 'cameras'],
   level: ['id', 'name', 'elevation', 'height', 'slab', 'plan'],
   plan: ['image', 'scale', 'origin', 'opacity'],
-  room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'materials'],
+  room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'thickness', 'materials'],
   opening: ['id', 'wall', 'at', 'type', 'width', 'height', 'sill', 'swing'],
   item: ['id', 'asset', 'room', 'at', 'facing', 'elevation', 'size', 'scale'],
   light: ['id', 'type', 'azimuth', 'elevation', 'intensity', 'color', 'at'],

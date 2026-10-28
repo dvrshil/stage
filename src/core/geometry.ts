@@ -49,8 +49,8 @@ export interface WallPiece {
   top: number
 }
 
-export const INTERIOR_THICKNESS = 0.12
-export const EXTERIOR_THICKNESS = 0.25
+export const INTERIOR_THICKNESS = 0.115
+export const EXTERIOR_THICKNESS = 0.23
 export const DEFAULT_SILL = 0.9
 const EPSILON = 1e-6
 
@@ -270,14 +270,13 @@ export function walls(scene: Scene): Wall[] {
       }
       spans.push({ bottom, top, covering: rooms, exterior })
     }
-    const edgeIsExterior = spans.some((s) => s.exterior)
     for (const span of spans) {
       const wall: Wall = {
         id: `${span.covering[0].room.id}/${span.covering[0].edge.index}@${span.bottom.toFixed(2)}`,
         a: piece.a,
         b: piece.b,
         length: Math.hypot(piece.b[0] - piece.a[0], piece.b[1] - piece.a[1]),
-        thickness: edgeIsExterior ? EXTERIOR_THICKNESS : INTERIOR_THICKNESS,
+        thickness: Math.max(span.exterior ? EXTERIOR_THICKNESS : INTERIOR_THICKNESS, ...span.covering.map((c) => c.room.thickness ?? 0)),
         height: span.top - span.bottom,
         elevation: span.bottom,
         rooms: span.covering.map((c) => c.room.id),

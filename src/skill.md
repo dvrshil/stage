@@ -49,6 +49,9 @@ browser: it updates the moment you write, and outlines what you changed.
   the west side, across the north, down the east, around a well; its open
   side faces south at facing 0) or `stairs/straight`. Give it a `size`
   [width, depth, rise]; the rise is the floor-to-floor height.
+- Walls are 23 cm outside and 11.5 cm between rooms. A room's `thickness`
+  makes all of its walls at least that thick (a lift shaft, a hall that
+  shares a house's outside wall).
 - `open: true` is outdoors: a terrace, a roof, a garden, a drive. No ceiling;
   a `parapet` (default 1 m, 0 for none) on edges that touch nothing; no wall
   at all where two open rooms meet. Outdoor floors: grass, pavers,
