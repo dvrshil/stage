@@ -254,8 +254,10 @@ export function walls(scene: Scene): Wall[] {
       const covering = piece.contributions.filter((c) => c.bottom <= bottom + EPSILON && c.top >= top - EPSILON)
       if (covering.length === 0) continue
       const closed = covering.filter((c) => !c.room.open)
-      // Two open rooms meeting: a lawn beside a path. No wall at all.
-      if (closed.length === 0 && covering.length > 1) continue
+      // Two open rooms meeting: a lawn beside a path. No wall at all, even
+      // when one has a parapet and the other none.
+      const openNeighbors = piece.contributions.filter((c) => c.room.open && c.bottom <= bottom + EPSILON && c.bottom + 3 >= top)
+      if (closed.length === 0 && openNeighbors.length > 1) continue
       const rooms = closed.length > 0 ? closed : covering
       // The slab band of one room where others share the edge below or
       // above is the edge of a floor, not a wall facing outside.

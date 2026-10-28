@@ -7,7 +7,7 @@ import { stair, type Stair } from './stairs.ts'
 // what they stand on, floor by floor and up the stairs. Pure plan geometry,
 // so the viewer walks with it and the tests check it.
 
-export const BODY_RADIUS = 0.2
+export const BODY_RADIUS = 0.18
 // How much room furniture gets beyond its footprint.
 const FURNITURE_MARGIN = 0.08
 // The most a step can climb or drop without a stair.
@@ -78,9 +78,10 @@ function toLocal([x, y]: Point, s: { x: number; y: number; angle: number }): Poi
 }
 
 // Whether something spanning bottom..top is in the way of a person whose
-// feet are at `foot`: anything from the shins up to head height.
-function inTheWay(bottom: number, top: number, foot: number): boolean {
-  return bottom < foot + 1.4 && top > foot + 0.25
+// feet are at `foot`: anything from a step's height up to head height. A
+// plinth under a doorway, or a kerb, is stepped onto, not walked into.
+function inTheWay(bottom: number, top: number, foot: number, over = STEP): boolean {
+  return bottom < foot + 1.4 && top > foot + over
 }
 
 // Pushes a position out of every wall and piece of furniture it overlaps,
@@ -93,16 +94,54 @@ export function resolve(p: Point, { walls, solids }: Obstacles, radius = BODY_RA
     let moved = false
     for (const w of walls) {
       if (!inTheWay(w.bottom, w.top, foot)) continue
-      const reach = w.half + radius
-      const [cx, cy] = closestOnSegment([x, y], w.a, w.b)
-      const d = Math.hypot(x - cx, y - cy)
-      if (d >= reach || d < 1e-9) continue
-      x = cx + ((x - cx) / d) * reach
-      y = cy + ((y - cy) / d) * reach
+      // The wall is a rectangle `half` across; the person a circle. Past
+      // the end of a piece, at a doorway, only the corner pushes, so a
+      // door is as wide as it is, not narrowed by the wall's thickness.
+      const dx = w.b[0] - w.a[0]
+      const dy = w.b[1] - w.a[1]
+      const length = Math.hypot(dx, dy)
+      if (length < 1e-9) continue
+      const ux = dx / length
+      const uy = dy / length
+      const along = (x - w.a[0]) * ux + (y - w.a[1]) * uy
+      const across = (x - w.a[0]) * -uy + (y - w.a[1]) * ux
+      const outAlong = along < 0 ? along : along > length ? along - length : 0
+      const outAcross = Math.abs(across) - w.half
+      if (outAlong === 0) {
+        // Beside the wall: push straight off its face.
+        if (outAcross >= radius) continue
+        const sign = across >= 0 ? 1 : -1
+        const want = sign * (w.half + radius)
+        x += (want - across) * -uy
+        y += (want - across) * ux
+      } else {
+        // Past an end: inside the wall's band, push back along the wall;
+        // off to the side, push away from the corner.
+        const dir = along < 0 ? -1 : 1
+        if (outAcross <= 0) {
+          if (Math.abs(outAlong) >= radius) continue
+          const push = radius - Math.abs(outAlong)
+          x += dir * ux * push
+          y += dir * uy * push
+        } else {
+          const d = Math.hypot(outAlong, outAcross)
+          if (d >= radius || d < 1e-9) continue
+          const cornerAlong = along < 0 ? 0 : length
+          const cornerAcross = across >= 0 ? w.half : -w.half
+          const cx = w.a[0] + ux * cornerAlong + -uy * cornerAcross
+          const cy = w.a[1] + uy * cornerAlong + ux * cornerAcross
+          const px = x - cx
+          const py = y - cy
+          const pl = Math.hypot(px, py) || 1
+          x = cx + (px / pl) * radius
+          y = cy + (py / pl) * radius
+        }
+      }
       moved = true
     }
     for (const s of solids) {
-      if (!inTheWay(s.bottom, s.top, foot)) continue
+      // A coffee table is walked around, not over.
+      if (!inTheWay(s.bottom, s.top, foot, 0.25)) continue
       const c = Math.cos(s.angle)
       const n = Math.sin(s.angle)
       let [lx, ly] = toLocal([x, y], s)

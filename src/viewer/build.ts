@@ -97,6 +97,9 @@ export interface Built {
   indoor: THREE.Object3D[]
   // The drawing under each level's plan view, by level id.
   overlays: Map<string, THREE.Object3D>
+  // Every ceiling light's place and strength. The viewer lights the few
+  // nearest the camera from a small pool, so the shaders stay small.
+  fixtures: { position: THREE.Vector3; intensity: number; level: number }[]
   sun?: THREE.DirectionalLight
 }
 
@@ -116,6 +119,7 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
   const entities = new Map<string, THREE.Object3D>()
   const indoor: THREE.Object3D[] = []
   const overlays = new Map<string, THREE.Object3D>()
+  const fixtures: Built['fixtures'] = []
   root.add(labels)
   const levels = levelsByElevation(scene)
   const levelIndex = (id: string) => Math.max(0, levels.findIndex((l) => l.id === id))
@@ -200,10 +204,11 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
           })
         }
         const share = area(room.floor) / lightSpots(room.floor).length
-        const lamp = new THREE.PointLight('#ffe6c4', 5 * Math.sqrt(Math.max(4, share)), 0, 2)
-        lamp.position.copy(toWorld([lx, ly], elevation + (hasModel(FIXTURES.ceilingLamp) ? globeBottom + 0.2 : height - 0.35)))
-        group.add(lamp)
-        indoor.push(lamp)
+        fixtures.push({
+          position: toWorld([lx, ly], elevation + (hasModel(FIXTURES.ceilingLamp) ? globeBottom + 0.2 : height - 0.35)),
+          intensity: 5 * Math.sqrt(Math.max(4, share)),
+          level: group.userData.level as number,
+        })
       }
     }
 
@@ -276,7 +281,7 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
       // Azimuth is the compass direction the sun is in, clockwise from north.
       sun.position.set(Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation), -Math.cos(azimuth) * Math.cos(elevation)).multiplyScalar(60)
       sun.castShadow = true
-      sun.shadow.mapSize.set(4096, 4096)
+      sun.shadow.mapSize.set(2048, 2048)
       sun.shadow.bias = -0.0004
       sun.shadow.normalBias = 0.03
       root.add(sun)
@@ -292,7 +297,7 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
     }
   }
 
-  return { root, entities, labels, indoor, overlays, sun }
+  return { root, entities, labels, indoor, overlays, fixtures, sun }
 }
 
 // Where a room's ceiling lights go: its center, or a grid about 4.5 m

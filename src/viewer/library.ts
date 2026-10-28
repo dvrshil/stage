@@ -8,6 +8,13 @@ import { EMPTY_LOCK, type Lock } from '../core/library.ts'
 
 let lock: Lock = EMPTY_LOCK
 const pending: Promise<unknown>[] = []
+// How much of what was asked for has arrived, for a progress bar.
+export const progress = { started: 0, done: 0 }
+function track<T>(task: Promise<T>): Promise<T> {
+  progress.started++
+  pending.push(task.finally(() => progress.done++))
+  return task
+}
 const textureSets = new Map<string, TextureSet>()
 
 export interface TextureSet {
@@ -33,7 +40,7 @@ export async function settled(): Promise<void> {
 const loader = new THREE.TextureLoader()
 function load(file: string, color: boolean, size: [number, number]): THREE.Texture {
   let done: () => void = () => {}
-  pending.push(new Promise<void>((resolve) => (done = resolve)))
+  track(new Promise<void>((resolve) => (done = resolve)))
   const texture = loader.load(`./library/${file}`, () => done(), undefined, () => done())
   texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
   texture.wrapS = THREE.RepeatWrapping
@@ -81,7 +88,7 @@ export function loadSky(id: string): Promise<Sky | undefined> {
       return { texture, sunAngle }
     })
     .catch(() => undefined)
-  pending.push(task)
+  track(task)
   return task
 }
 
@@ -145,7 +152,7 @@ export function loadModel(id: string): Promise<THREE.Object3D | undefined> {
       })
       .catch(() => undefined)
     models.set(id, task)
-    pending.push(task)
+    track(task)
   }
   return task
 }

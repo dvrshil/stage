@@ -13,7 +13,7 @@ import { SKY } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
 import { applyCutaway, buildScene, floorMaterial, toWorld, type Built } from './build.ts'
 import { useSurfaces } from './furniture.ts'
-import { loadLibrary, loadSky, settled, type Sky } from './library.ts'
+import { loadLibrary, loadSky, progress, settled, type Sky } from './library.ts'
 import { speckle } from './textures.ts'
 
 // The viewer. The same page serves a person in a browser and the command
@@ -42,6 +42,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 1.1
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.shadowMap.autoUpdate = false
 
 const world = new THREE.Scene()
 const pmrem = new THREE.PMREMGenerator(renderer)
@@ -49,6 +50,42 @@ world.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
 // Low: a bright studio reflection washes floors out at low angles.
 world.environmentIntensity = 0.18
 const hemisphere = new THREE.HemisphereLight('#e3ecf7', '#8d8270', 0.9)
+// Room lights come from a small pool that follows the camera: the few
+// fixtures nearest you are lit. A fixed count keeps the shaders compiled
+// once; a light per room would put seventy lights in every one.
+const LIGHT_POOL = 6
+const lightPool = Array.from({ length: LIGHT_POOL }, () => {
+  const light = new THREE.PointLight('#ffe6c4', 0, 0, 2)
+  world.add(light)
+  return light
+})
+let lightsPlaced = 0
+function placeLights(now: number) {
+  if (!built || now - lightsPlaced < 150) return
+  lightsPlaced = now
+  const eye = perspective.position
+  const nearest = built.fixtures
+    .filter((f) => f.level <= cap && Math.abs(f.position.y - eye.y) < 4.5)
+    .map((f) => ({ f, d: f.position.distanceToSquared(eye) }))
+    .sort((p, q) => p.d - q.d)
+    .slice(0, LIGHT_POOL)
+  lightPool.forEach((light, i) => {
+    const pick = nearest[i]
+    if (!pick || !inside) {
+      light.intensity = 0
+      return
+    }
+    light.position.copy(pick.f.position)
+    light.intensity = pick.f.intensity
+  })
+}
+
+// The sun's shadows are drawn again only when something changed: a
+// rebuild, a level shown or hidden, a ceiling appearing. Walking around
+// moves nothing, so every frame reuses them.
+function shadowsChanged() {
+  renderer.shadowMap.needsUpdate = true
+}
 world.add(hemisphere)
 // A drawn gradient until the photographed sky loads.
 const dome = sky()
@@ -218,6 +255,7 @@ function fitPlan() {
 // of the level a plan view looks at.
 function applyLevelCap() {
   if (!built) return
+  shadowsChanged()
   const show = (object: THREE.Object3D) => {
     const level = object.userData.level as number | undefined
     if (level !== undefined) object.visible = level <= cap
@@ -290,6 +328,7 @@ function updateInside() {
   if (now === inside) return
   inside = now
   for (const object of built.indoor) object.visible = now
+  shadowsChanged()
   // Outside, the sky fills the house; inside, windows and room lights do
   // the work, and sky light that would leak through the walls is cut.
   hemisphere.intensity = skyImage ? (now ? 0.5 : 0.45) : now ? 0.55 : 0.9
@@ -738,6 +777,9 @@ async function load(first: boolean): Promise<void> {
   planLevel = Math.min(planLevel, levels.length - 1)
   built = buildScene(next, { fileUrl: (relative) => `./api/file?path=${encodeURIComponent(scenePath)}&file=${encodeURIComponent(relative)}` })
   world.add(built.root)
+  shadowsChanged()
+  // Compile every shader now, so the first turn of the head doesn't stall.
+  renderer.compile(world, perspective)
   blocking = obstacles(next)
   alignSky()
   if (built.sun) {
@@ -818,6 +860,21 @@ function restoreView(): boolean {
 }
 setInterval(saveView, 1000)
 
+// A thin bar across the top while textures and models arrive.
+let progressShown = -1
+function showProgress() {
+  if (headless) return
+  const left = progress.started - progress.done
+  const fraction = progress.started === 0 ? 1 : progress.done / progress.started
+  if (fraction === progressShown) return
+  progressShown = fraction
+  const bar = $('progress')
+  bar.style.width = `${Math.round(fraction * 100)}%`
+  bar.parentElement!.classList.toggle('hidden', left === 0)
+  const label = $('progress-label')
+  label.textContent = left === 0 ? '' : `Loading ${progress.done} of ${progress.started}`
+}
+
 let statusDetail = ''
 function setStatus(detail: string) {
   statusDetail = detail
@@ -869,7 +926,10 @@ function frame() {
     }
   }
   updateInside()
+  placeLights(now)
   if (built) applyCutaway(built.root, active, !inside, active === perspective, view === 'orbit' || view === 'focus', cap)
+  if (view === 'orbit' || view === 'focus') shadowsChanged()
+  showProgress()
   // Ambient occlusion only once the view holds still: moving stays smooth,
   // and the finished picture fills in a fifth of a second after you stop.
   perspective.updateMatrixWorld()

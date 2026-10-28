@@ -245,3 +245,22 @@ test('walls on another level never block a person', async () => {
   const [x] = resolve([5.5, 4.5], blocking, undefined, 0.3)
   assert.ok(x <= 5.5, 'the store wall is there on the ground floor')
 })
+
+test('an item in a doorway is reported', async () => {
+  const raw = await example()
+  // The front door is on the living room's south wall; a bookcase right inside it.
+  const door = raw.openings.find((o: any) => o.id === 'front-door')
+  const room = raw.rooms.find((r: any) => r.id === door.wall.room)
+  const [ax, ay] = room.floor[door.wall.edge]
+  const [bx, by] = room.floor[(door.wall.edge + 1) % room.floor.length]
+  const t = (door.at + door.width / 2) / Math.hypot(bx - ax, by - ay)
+  const cx = ax + (bx - ax) * t
+  const cy = ay + (by - ay) * t
+  const nx = -(by - ay) / Math.hypot(bx - ax, by - ay)
+  const ny = (bx - ax) / Math.hypot(bx - ax, by - ay)
+  // Inside the room is the side the room's centroid is on.
+  const [mx, my] = room.floor.reduce(([sx, sy]: number[], [x, y]: number[]) => [sx + x / room.floor.length, sy + y / room.floor.length], [0, 0])
+  const sign = (mx - cx) * nx + (my - cy) * ny > 0 ? 1 : -1
+  raw.items.push({ id: 'blocker', asset: 'shelf/bookcase', room: room.id, at: [cx + nx * sign * 0.4, cy + ny * sign * 0.4] })
+  assert.match(messages(raw).join('\n'), /warning blocker: "blocker" stands in the way of door "front-door"/)
+})

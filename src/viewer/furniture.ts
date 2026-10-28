@@ -476,19 +476,8 @@ const BUILDERS: Record<string, Builder> = {
     }
     return g
   },
-  'tree/small': ([w, d, h]) => {
-    const g = new THREE.Group()
-    cylinder(g, WOOD_DARK, 0.07, 0.1, h * 0.45)
-    const leaf = mat('#3f6f36', 0.9)
-    for (const [x, y, z, r] of [[0, 0.72, 0, 0.5], [0.3, 0.6, 0.15, 0.34], [-0.28, 0.66, -0.1, 0.36], [0.05, 0.86, -0.2, 0.3], [-0.1, 0.55, 0.3, 0.3]]) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), leaf)
-      m.scale.set(r * w, r * h * 0.6, r * d)
-      m.position.set(x * w, y * h, z * d)
-      m.castShadow = true
-      g.add(m)
-    }
-    return g
-  },
+  'tree/small': (size) => tree(size, 0.42),
+  'tree/round': (size) => tree(size, 0.3),
   'car/sedan': ([w, d, h]) => {
     const g = new THREE.Group()
     const paint = new THREE.MeshPhysicalMaterial({ color: '#2b3540', roughness: 0.3, metalness: 0.6, clearcoat: 1, clearcoatRoughness: 0.08 })
@@ -525,6 +514,34 @@ const BUILDERS: Record<string, Builder> = {
   },
   'stairs/horseshoe': (size, options) => stairs(size, options, 'stairs/horseshoe'),
   'stairs/straight': (size, options) => stairs(size, options, 'stairs/straight'),
+}
+
+// A tree from a tapered trunk, three leaning branches, and a crown of
+// overlapping leaf balls in two greens. Light enough to plant a street of.
+function tree([w, d, h]: [number, number, number], trunkShare: number): THREE.Group {
+  const g = new THREE.Group()
+  const bark = mat('#5e4a3a', 0.95)
+  const trunkH = h * trunkShare
+  cylinder(g, bark, 0.06 * h / 4, 0.1 * h / 4, trunkH)
+  for (const [angle, lean] of [[0.3, 0.5], [2.4, 0.45], [4.3, 0.55]]) {
+    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, h * 0.35, 7), bark)
+    branch.position.set(Math.cos(angle) * w * 0.12, trunkH + h * 0.12, Math.sin(angle) * d * 0.12)
+    branch.rotation.set(Math.sin(angle) * lean, 0, -Math.cos(angle) * lean)
+    branch.castShadow = true
+    g.add(branch)
+  }
+  const greens = [mat('#4d7c3a', 0.9), mat('#5f8f45', 0.9), mat('#3f6a33', 0.9)]
+  const crownBottom = trunkH + h * 0.08
+  const crownH = h - crownBottom
+  const balls: [number, number, number, number][] = [[0, 0.5, 0, 0.5], [0.32, 0.4, 0.1, 0.36], [-0.3, 0.45, -0.12, 0.38], [0.08, 0.72, -0.22, 0.34], [-0.12, 0.3, 0.3, 0.33], [0.22, 0.62, 0.28, 0.3], [-0.26, 0.7, 0.12, 0.3]]
+  balls.forEach(([x, y, z, r], i) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), greens[i % greens.length])
+    m.scale.set(r * w, r * crownH * 1.1, r * d)
+    m.position.set(x * w, crownBottom + y * crownH, z * d)
+    m.castShadow = true
+    g.add(m)
+  })
+  return g
 }
 
 // Stairs from the same geometry the walker climbs: solid treads with a

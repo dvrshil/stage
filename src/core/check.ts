@@ -1,5 +1,5 @@
 import { findAsset } from './assets.ts'
-import { DEFAULT_SILL, area, edges, levelsByElevation, pointInPolygon, roomHeight } from './geometry.ts'
+import { DEFAULT_SILL, area, edges, levelsByElevation, pointInPolygon, roomElevation, roomHeight, type Point } from './geometry.ts'
 import { MATERIALS } from './materials.ts'
 import { COLLECTIONS, Scene } from './schema.ts'
 
@@ -235,6 +235,39 @@ function spatial(scene: Scene): Problem[] {
     }
   })
 
+  // A door needs 70 cm clear on both sides; an item standing there blocks it.
+  const CLEAR = 0.7
+  scene.openings.forEach((opening) => {
+    // Windows, and wide openings that are really a missing wall, don't need a clear path.
+    if (opening.type === 'window' || (opening.type === 'opening' && opening.width > 1.5)) return
+    const room = rooms.get(opening.wall.room)
+    const edge = room && edges(room)[opening.wall.edge]
+    if (!room || !edge || edge.length === 0) return
+    const ux = (edge.b[0] - edge.a[0]) / edge.length
+    const uy = (edge.b[1] - edge.a[1]) / edge.length
+    const center: Point = [edge.a[0] + ux * (opening.at + opening.width / 2), edge.a[1] + uy * (opening.at + opening.width / 2)]
+    const floor = roomElevation(scene, room)
+    scene.items.forEach((item, index) => {
+      const info = findAsset(item.asset)
+      // Lift doors and railings belong in an opening.
+      if (info?.passable || PASSABLE.has(item.asset) || info?.category === 'lift' || info?.category === 'railing') return
+      const size = info && !info.resizable ? info.size : (item.size ?? info?.size)
+      if (!size) return
+      const itemRoom = rooms.get(item.room)
+      const base = (itemRoom ? roomElevation(scene, itemRoom) : 0) + item.elevation
+      if (base > floor + opening.height || base + size[2] * item.scale < floor + 0.25) return
+      const zone = { x: center[0], y: center[1], halfW: opening.width / 2, halfD: CLEAR, angle: Math.atan2(uy, ux) }
+      const box = { x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2 + 0.05, halfD: (size[1] * item.scale) / 2 + 0.05, angle: (-item.facing * Math.PI) / 180 }
+      if (!rectanglesOverlap(zone, box)) return
+      problems.push({
+        severity: 'warning',
+        path: `items.${index}.at`,
+        entity: item.id,
+        message: `"${item.id}" stands in the way of ${opening.type} "${opening.id}" (${opening.wall.room}, edge ${opening.wall.edge}); keep ${CLEAR} m clear on both sides of it.`,
+      })
+    })
+  })
+
   scene.items.forEach((item, index) => {
     const room = rooms.get(item.room)
     if (!room) return
@@ -250,6 +283,40 @@ function spatial(scene: Scene): Problem[] {
   })
 
   return problems
+}
+
+const PASSABLE = new Set(['rug/area', 'kitchen/wall-cabinets', 'tv/wall', 'screen/projection'])
+
+// Two rectangles, each by center, half sizes, and turn: the separating
+// axis test on their four edge directions.
+interface Rect {
+  x: number
+  y: number
+  halfW: number
+  halfD: number
+  angle: number
+}
+function corners(r: Rect): Point[] {
+  const c = Math.cos(r.angle)
+  const s = Math.sin(r.angle)
+  return ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([i, j]) => [r.x + i * r.halfW * c - j * r.halfD * s, r.y + i * r.halfW * s + j * r.halfD * c])
+}
+export function rectanglesOverlap(p: Rect, q: Rect): boolean {
+  const a = corners(p)
+  const b = corners(q)
+  for (const poly of [a, b]) {
+    for (let i = 0; i < 4; i++) {
+      const [x1, y1] = poly[i]
+      const [x2, y2] = poly[(i + 1) % 4]
+      const nx = -(y2 - y1)
+      const ny = x2 - x1
+      const project = (points: Point[]) => points.map(([x, y]) => x * nx + y * ny)
+      const pa = project(a)
+      const pb = project(b)
+      if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false
+    }
+  }
+  return true
 }
 
 // A room reached through a neighbor's opening on the shared wall.
