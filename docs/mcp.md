@@ -82,6 +82,7 @@ an example entity for every collection, `query` lists its questions, and
 | `set`, `remove`, `write_scene` | Change the file; every write is checked and reported |
 | `read_scene` | The whole file, when query is not enough |
 | `assets`, `fetch_assets`, `materials` | The library, downloading what a scene needs, the surfaces |
+| `find_model`, `fetch_model` | Search the open model libraries with thumbnails; fetch one beside the scene and place it |
 | `schema` | The format as JSON Schema, whole or per collection |
 | `export` | The built scene as binary glTF |
 

@@ -177,7 +177,17 @@ export const SceneObject = z.discriminatedUnion('kind', [
   z.object({ ...objectBase, kind: z.literal('extrude'), polygon: z.array(point).min(3), height: z.number().positive() }),
   // A glTF or glb file beside the scene, or an https URL. With a `size`
   // the model is fitted into it; without, it keeps its own scale.
-  z.object({ ...objectBase, kind: z.literal('model'), file: z.string(), size: point3.optional() }),
+  z.object({
+    ...objectBase,
+    kind: z.literal('model'),
+    file: z.string(),
+    size: point3.optional(),
+    // Where it came from and whose it is, kept with the scene so a shared
+    // bundle can credit the author.
+    source: z.string().optional(),
+    license: z.string().optional(),
+    credit: z.string().optional(),
+  }),
   // A piece from the library, outside the room system.
   z.object({ ...objectBase, kind: z.literal('asset'), asset: z.string(), size: point3.optional() }),
   z.object({ ...objectBase, kind: z.literal('group') }),
@@ -220,7 +230,7 @@ export const KEY_ORDER: Record<string, string[]> = {
   room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'thickness', 'materials'],
   opening: ['id', 'wall', 'at', 'type', 'width', 'height', 'sill', 'swing'],
   item: ['id', 'asset', 'room', 'at', 'facing', 'elevation', 'size', 'scale'],
-  object: ['id', 'kind', 'name', 'label', 'parent', 'room', 'at', 'facing', 'pitch', 'roll', 'scale', 'size', 'radius', 'top', 'height', 'polygon', 'file', 'asset', 'material', 'color', 'roughness', 'metalness', 'opacity', 'glow', 'solid'],
+  object: ['id', 'kind', 'name', 'label', 'parent', 'room', 'at', 'facing', 'pitch', 'roll', 'scale', 'size', 'radius', 'top', 'height', 'polygon', 'file', 'source', 'license', 'credit', 'asset', 'material', 'color', 'roughness', 'metalness', 'opacity', 'glow', 'solid'],
   light: ['id', 'type', 'azimuth', 'elevation', 'intensity', 'color', 'at'],
   camera: ['id', 'type', 'at', 'look', 'fov', 'level'],
   material: ['id', 'color', 'roughness', 'metalness', 'texture', 'size', 'tint', 'shade'],

@@ -792,7 +792,7 @@ async function load(first: boolean): Promise<void> {
   levels = levelsByElevation(next)
   if (cap !== Infinity && cap >= levels.length - 1) cap = Infinity
   planLevel = Math.min(planLevel, levels.length - 1)
-  built = buildScene(next, { fileUrl: (relative) => (bundled ? `./files/${relative}` : `./api/file?path=${encodeURIComponent(scenePath)}&file=${encodeURIComponent(relative)}`) })
+  built = buildScene(next, { fileUrl: (relative) => (bundled ? `./files/${relative}` : `./files/${btoa(unescape(encodeURIComponent(scenePath))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}/${relative.split('/').map(encodeURIComponent).join('/')}`) })
   world.add(built.root)
   shadowsChanged()
   // Compile every shader now, so the first turn of the head doesn't stall.

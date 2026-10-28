@@ -43,9 +43,16 @@ export async function shareScene(scenePath: string, scene: Scene, outDir: string
       log(`skipping missing model ${object.file}`)
       continue
     }
-    const target = join(dir, 'files', object.file)
-    await mkdir(dirname(target), { recursive: true })
-    await cp(source, target)
+    // A .gltf names its buffers and textures beside it: take the folder.
+    const whole = object.file.toLowerCase().endsWith('.gltf')
+    const target = join(dir, 'files', whole ? dirname(object.file) : object.file)
+    await mkdir(whole ? target : dirname(target), { recursive: true })
+    await cp(whole ? dirname(source) : source, target, { recursive: true })
+    files++
+  }
+  const credits = scene.objects.filter((o) => o.kind === 'model' && (o.credit || o.source)).map((o) => (o.kind === 'model' ? `${o.name ?? o.id}: ${o.credit ?? ''}${o.license ? ` (${o.license})` : ''}${o.source ? ` ${o.source}` : ''}`.trim() : ''))
+  if (credits.length) {
+    await writeFile(join(dir, 'CREDITS.txt'), `${credits.join('\n')}\n`)
     files++
   }
   for (const item of scene.items) {

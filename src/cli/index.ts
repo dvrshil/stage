@@ -39,6 +39,8 @@ Commands that need no display:
   assets [words...] [--category c]     Search the asset library
   assets fetch [ids|scene.json...] [--all]  Download CC0 textures, models and the sky into the local cache
   materials                            List the built-in materials
+  models find <words...> [--source s]  Search the open model libraries (Poly Haven and more)
+  models fetch <scene> <source> <id>   Download a model beside the scene, measured
   fmt <scene>                          Rewrite the scene in canonical form
   schema                               Print the scene format as JSON Schema
   mcp                                  Run as an MCP server over stdio
@@ -72,6 +74,7 @@ async function main(argv: string[]): Promise<number> {
     strict: false,
     options: {
       json: { type: 'boolean' },
+      source: { type: 'string' },
       out: { type: 'string', short: 'o' },
       camera: { type: 'string' },
       level: { type: 'string' },
@@ -213,6 +216,27 @@ async function main(argv: string[]): Promise<number> {
       if (json) print(found)
       else for (const a of found) print(`${a.id.padEnd(28)} ${a.size.join(' x ')} m   ${a.name}`)
       return 0
+    }
+
+    case 'models': {
+      const { findModels, fetchModelBesideScene, SOURCES } = await import('./models.ts')
+      if (positionals[0] === 'find') {
+        const { hits, skipped } = await findModels(positionals.slice(1).join(' '), { source: values.source as string | undefined, limit: 12 })
+        if (json) print({ hits, skipped })
+        else {
+          for (const h of hits) print(`${`${h.source}:${h.id}`.padEnd(44)} ${h.license.padEnd(6)} ${h.name}${h.credit ? ` (${h.credit})` : ''}`)
+          if (skipped.length) print(`not searched: ${skipped.join('; ')}`)
+        }
+        return 0
+      }
+      if (positionals[0] === 'fetch') {
+        const [, scenePath, source, id] = positionals
+        if (!scenePath || !source || !id) return fail(`stage models fetch <scene> <source> <id>; sources are ${SOURCES.map((s) => s.id).join(', ')}`)
+        const fetched = await fetchModelBesideScene(resolve(scenePath), source, id)
+        json ? print(fetched) : print(`Fetched ${fetched.file} (${fetched.size.join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''})`)
+        return 0
+      }
+      return fail('stage models find <words> | stage models fetch <scene> <source> <id>')
     }
 
     case 'materials':

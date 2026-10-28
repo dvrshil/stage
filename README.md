@@ -13,7 +13,8 @@ one, for a product, a device, a creature, a set, an explanation in space.
 **Buildings** are rooms, doors, windows, stairs, and furniture, from a floor
 plan or a description: walls come from room edges, levels stack, and whole
 houses work, with the architect's drawing under each plan. A library of
-about two hundred CC0 pieces with real sizes serves both.
+about two hundred CC0 pieces with real sizes serves both, and the open
+model libraries are a search away for everything else.
 
 | No rooms at all: a desk, a computer, and a duck built from parts | A house from a floor plan |
 | --- | --- |
@@ -152,6 +153,8 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 | `stage share <scene> -o folder` | The viewer, scene, and only the assets it needs, for any static host |
 | `stage assets [words]` | Search the furniture library |
 | `stage assets fetch [ids \| scene.json] [--all]` | Download the CC0 assets: the basics, what a scene uses, or everything |
+| `stage models find <words> [--source s]` | Search the open model libraries for anything else: a bicycle, a dinosaur, a laptop |
+| `stage models fetch <scene> <source> <id>` | Download one beside the scene, measured, ready for a `model` object |
 
 ## The viewer
 

@@ -36,8 +36,8 @@ stands in rooms, levels stack. A scene with no rooms is fine.
   with the scene once, so the picture shows the real models and surfaces.
 - The tools: `new_scene`, `open_viewer`, `show` (fly the person's view),
   `check`, `render` (an image you look at), `query`, `set`, `remove`,
-  `write_scene`, `read_scene`, `assets`, `fetch_assets`, `materials`,
-  `schema`, `export` (glTF). Resources `stage://guide`, `stage://schema`,
+  `write_scene`, `read_scene`, `assets`, `fetch_assets`, `find_model`,
+  `fetch_model`, `materials`, `schema`, `export` (glTF). Resources `stage://guide`, `stage://schema`,
   and `stage://examples/<name>` hold this guide, the format, and the
   example scenes.
 
@@ -90,6 +90,12 @@ stands in rooms, levels stack. A scene with no rooms is fine.
   children. Build a thing, query it, render it, and compare the two.
 - Build order for a thing: a `group` at its place, the biggest part first,
   then the rest in the group's frame. Render `orbit` and a camera close in.
+- Something the library lacks (a bicycle, a dinosaur, a laptop, a tree):
+  `find_model` searches the open model libraries and shows thumbnails;
+  look at them, then `fetch_model` with `place` puts the one you pick in
+  the scene as a `model` object, measured, with its license and author
+  recorded. Search first; build from primitives when nothing fits or the
+  thing is simple and geometric; never guess at a file that is not there.
 
 ## Several floors
 

@@ -12,6 +12,7 @@ import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, jsonSchema, type Collection } from '../core/schema.ts'
 import { format, readScene, writeScene } from '../core/store.ts'
 import { EXAMPLES, ROOT, SCHEMAS, checkScene, control, newScene, openViewer, removeEntity, upsert } from './ops.ts'
+import { SOURCES, available, fetchModelBesideScene, findModels, thumbnailImage } from './models.ts'
 import { Renderer } from './render.ts'
 import { VERSION } from './server.ts'
 
@@ -285,6 +286,69 @@ export async function runMcp(): Promise<void> {
         const lines: string[] = []
         await fetchAssets({ ids: wanted, log: (line) => lines.push(line) })
         return [text(lines.length ? lines.join('\n') : 'nothing new to fetch')]
+      }),
+  )
+
+  server.registerTool(
+    'find_model',
+    {
+      title: 'Find a model in the open libraries',
+      description: `Search the free, openly licensed 3D model libraries for anything the built-in library lacks: a shoe, a bicycle, a dinosaur, a laptop. Returns up to \`limit\` hits with id, license, author, triangle count where known, and their thumbnails as images, so look at them and pick. Sources: ${SOURCES.map((s) => `${s.id} (${s.about})`).join('; ')}. Search first; build from primitives only when nothing fits; generate never. Then fetch_model with the source and id.`,
+      inputSchema: {
+        words: z.string().describe('What to look for, e.g. "rubber duck", "office chair", "oak tree"'),
+        source: z.enum(SOURCES.map((s) => s.id) as [string, ...string[]]).optional().describe('One source; every available one by default'),
+        limit: z.number().int().min(1).max(20).default(8),
+        thumbnails: z.boolean().default(true).describe('Return each hit\'s thumbnail as an image'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    ({ words, source, limit, thumbnails }) =>
+      guarded(async () => {
+        const { hits, skipped } = await findModels(words, { source, limit })
+        const lines = hits.map((h, i) => `${i + 1}. ${h.source}:${h.id}  ${h.name}  [${h.license}${h.credit ? `, ${h.credit}` : ''}]${h.triangles ? `  ${h.triangles.toLocaleString()} tris` : ''}${h.size ? `  ${h.size.join(' × ')} m` : ''}  ${h.url}`)
+        const content: Content[] = [text(hits.length ? `${lines.join('\n')}\n\nfetch_model with source and id places one. Sources searched: ${available().map((s) => s.id).join(', ')}.${skipped.length ? ` Not searched: ${skipped.join('; ')}.` : ''}` : `nothing found for "${words}"${skipped.length ? ` (not searched: ${skipped.join('; ')})` : ''}; try other words, or build it from primitives.`)]
+        if (thumbnails) {
+          const images = await Promise.all(hits.map((h) => thumbnailImage(h)))
+          images.forEach((image, i) => {
+            if (!image) return
+            content.push(text(`${i + 1}. ${hits[i].source}:${hits[i].id}`))
+            content.push({ type: 'image', data: image.data, mimeType: image.mimeType })
+          })
+        }
+        return content
+      }),
+  )
+
+  server.registerTool(
+    'fetch_model',
+    {
+      title: 'Fetch a model beside the scene',
+      description: 'Download a model found with find_model into a models/ folder beside the scene file, measure it, and, with `place`, add it to the scene as a `model` object in one go (its size, license, author and source are recorded on the object). Without `place`, returns the file and size for a set call of your own.',
+      inputSchema: {
+        scene: scenePath,
+        source: z.enum(SOURCES.map((s) => s.id) as [string, ...string[]]),
+        id: z.string().describe('The id find_model gave'),
+        place: z
+          .object({
+            id: z.string().describe('The object id to give it'),
+            at: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
+            facing: z.number().default(0),
+            parent: z.string().optional(),
+            room: z.string().optional(),
+            size: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Fit it into this box instead of its own size'),
+            label: z.string().optional(),
+          })
+          .optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    ({ scene, source, id, place }) =>
+      guarded(async () => {
+        const fetched = await fetchModelBesideScene(resolve(scene), source, id)
+        if (!place) return [text({ ...fetched, next: `set objects {"id": ..., "kind": "model", "file": "${fetched.file}", "size": ${JSON.stringify(fetched.size)}, "at": [x, y, z]}` })]
+        const entity = { id: place.id, kind: 'model', file: fetched.file, size: place.size ?? fetched.size, at: place.at, facing: place.facing, parent: place.parent, room: place.room, label: place.label, source: fetched.source, license: fetched.license, credit: fetched.credit || undefined }
+        const { replaced, result } = await upsert(scene, 'objects', JSON.parse(JSON.stringify(entity)))
+        return [text(`${replaced ? 'replaced' : 'added'} ${place.id}: ${fetched.file}, ${fetched.size.join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''}\n${problems(result)}`)]
       }),
   )
 

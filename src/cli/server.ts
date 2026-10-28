@@ -25,8 +25,16 @@ const TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.hdr': 'application/octet-stream',
   '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream',
+  '.ktx2': 'image/ktx2',
   '.svg': 'image/svg+xml',
 }
+
+// The scene's folder as a path segment: a glTF's textures and buffers are
+// named relative to the glTF, so they must sit at sibling URLs.
+export const sceneToken = (scenePath: string) => Buffer.from(scenePath).toString('base64url')
+const fromToken = (token: string) => Buffer.from(token, 'base64url').toString()
 
 interface Channel {
   clients: Set<ServerResponse>
@@ -110,6 +118,18 @@ export async function startServer(port = DEFAULT_PORT): Promise<StageServer> {
       const file = normalize(join(CACHE, decodeURIComponent(url.pathname.slice('/library/'.length))))
       if (!file.startsWith(CACHE) || !existsSync(file)) return send(response, 404, { error: 'not in the asset cache; run: stage assets fetch' })
       response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'max-age=31536000, immutable' })
+      createReadStream(file).pipe(response)
+      return
+    }
+
+    // /files/<scene token>/<relative path>: a file beside the scene, at a
+    // URL whose siblings are the file's siblings.
+    const sibling = /^\/files\/([A-Za-z0-9_-]+)\/(.+)$/.exec(url.pathname)
+    if (sibling) {
+      const folder = dirname(fromToken(sibling[1]))
+      const file = normalize(join(folder, decodeURIComponent(sibling[2])))
+      if (!file.startsWith(folder + '/') || !existsSync(file) || statSync(file).isDirectory()) return send(response, 404, { error: 'no such file beside the scene' })
+      response.writeHead(200, { 'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' })
       createReadStream(file).pipe(response)
       return
     }
