@@ -46,7 +46,15 @@ const getRenderer = () => (renderer ??= Renderer.start().catch((error) => {
   renderer = undefined
   throw error
 }))
+// Renders take turns: one page cannot draw two cameras at once, and a
+// client may call render twice in one go.
+let queue: Promise<unknown> = Promise.resolve()
 async function withRenderer<T>(work: (r: Renderer) => Promise<T>): Promise<T> {
+  const turn = queue.then(() => renderNow(work), () => renderNow(work))
+  queue = turn.catch(() => {})
+  return turn
+}
+async function renderNow<T>(work: (r: Renderer) => Promise<T>): Promise<T> {
   clearTimeout(idle)
   const r = await getRenderer()
   try {
