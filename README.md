@@ -167,7 +167,8 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 ## The viewer
 
 **Walk inside** (or `V`) to walk at eye level: `W` `A` `S` `D` and the mouse,
-`Shift` to hurry. Walls and furniture stop you. `O` is the overview, `P` the
+`Shift` to hurry. Walls and furniture stop you. `↑` and `↓` fly up and
+down, free of the floor until you land on one again. `O` is the overview, `P` the
 plan, `C` the next camera, `Q` switches between high quality and fast
 rendering, and clicking anything shows its id and size. The page reloads
 itself when the viewer is rebuilt, keeping your view.

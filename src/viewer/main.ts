@@ -424,7 +424,11 @@ function standOn(p: Point, near: number): number {
 
 // Where the person last stood, so leaving for the overview and coming
 // back continues the walk.
-let lastWalk: { position: THREE.Vector3; yaw: number; pitch: number; foot: number } | undefined
+let lastWalk: { position: THREE.Vector3; yaw: number; pitch: number; foot: number; flying: boolean } | undefined
+// The up and down arrows lift and lower the person, free of the floor,
+// until they come back down onto one: the third axis, for looking at a
+// roof, a tall thing, or the whole scene from a chosen spot.
+let flying = false
 
 function beginWalk(at: Point, z: number, lookAt?: THREE.Vector3, label = 'walk') {
   if (!scene) return
@@ -461,6 +465,12 @@ function startWalk() {
     yaw = lastWalk.yaw
     pitch = lastWalk.pitch
     beginWalk([lastWalk.position.x, -lastWalk.position.z], lastWalk.foot)
+    if (lastWalk.flying) {
+      flying = true
+      foot = lastWalk.foot
+      eyeHeight = foot + EYE
+      perspective.position.y = eyeHeight
+    }
     return
   }
   const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
@@ -475,7 +485,7 @@ function startWalk() {
 }
 
 function rememberWalk() {
-  if (view === 'walk') lastWalk = { position: perspective.position.clone(), yaw, pitch, foot }
+  if (view === 'walk') lastWalk = { position: perspective.position.clone(), yaw, pitch, foot, flying }
 }
 
 const keys = new Set<string>()
@@ -494,23 +504,36 @@ function walkStep(delta: number) {
   const right = new THREE.Vector2(forward.y, -forward.x)
   let f = 0
   let r = 0
-  if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1
-  if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1
+  if (keys.has('KeyW')) f += 1
+  if (keys.has('KeyS')) f -= 1
   if (keys.has('KeyD')) r += 1
   if (keys.has('KeyA')) r -= 1
+  // Up and down take off; the floor is left behind until it is met again.
+  let lift = 0
+  if (keys.has('ArrowUp')) lift += 1
+  if (keys.has('ArrowDown')) lift -= 1
+  if (lift !== 0) {
+    flying = true
+    foot = Math.max(-0.5, foot + lift * speed * delta)
+  }
   const wanted = forward.multiplyScalar(f).add(right.multiplyScalar(r))
   if (wanted.lengthSq() > 0) wanted.setLength(speed)
   velocity.lerp(wanted, 1 - Math.exp(-delta * 10))
-  if (velocity.lengthSq() < 1e-5) {
-    velocity.set(0, 0)
-    return
-  }
+  if (velocity.lengthSq() < 1e-5) velocity.set(0, 0)
+  if (velocity.lengthSq() === 0 && lift === 0 && !flying) return
   const here: Point = [perspective.position.x, -perspective.position.z]
-  let next = resolve([here[0] + velocity.x * delta, here[1] + velocity.y * delta])
-  // Nothing to stand on, or a drop or climb bigger than a step: stay put.
-  // A railing would stop you in a real house; here the edge itself does.
+  let next = velocity.lengthSq() === 0 ? here : resolve([here[0] + velocity.x * delta, here[1] + velocity.y * delta])
   const below = ground(next, blocking, foot)
-  if (below === undefined || Math.abs(below - foot) > STEP) {
+  if (flying) {
+    // Coming level with a floor, from above or along it, is a landing;
+    // anywhere else is air, down to the ground at zero.
+    if (below !== undefined && foot <= below + 0.05 && foot >= below - STEP && lift <= 0) {
+      foot = below
+      flying = false
+    } else if (below === undefined && foot < 0) foot = 0
+  } else if (below === undefined || Math.abs(below - foot) > STEP) {
+    // Nothing to stand on, or a drop or climb bigger than a step: stay put.
+    // A railing would stop you in a real house; here the edge itself does.
     next = here
     velocity.set(0, 0)
   } else {
@@ -518,7 +541,7 @@ function walkStep(delta: number) {
   }
   // What the walls took away is gone from the velocity too, so pressing
   // into a wall doesn't build up speed that jerks you along when it ends.
-  velocity.set((next[0] - here[0]) / delta, (next[1] - here[1]) / delta)
+  if (velocity.lengthSq() > 0) velocity.set((next[0] - here[0]) / delta, (next[1] - here[1]) / delta)
   // The eyes follow the feet with a little lag, so stairs feel like stairs
   // rather than a lift.
   eyeHeight += (foot + EYE - eyeHeight) * (1 - Math.exp(-delta * 14))
