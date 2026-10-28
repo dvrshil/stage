@@ -101,9 +101,11 @@ test('writes are atomic and leave nothing behind', async () => {
 })
 
 test('asset search needs every word to match', () => {
-  assert.deepEqual(searchAssets('dining chair').map((a) => a.id), ['chair/dining'])
+  assert.equal(searchAssets('dining chair').map((a) => a.id)[0], 'chair/dining', 'the curated chair comes first')
   assert.ok(searchAssets('sofa').length >= 2)
-  assert.deepEqual(searchAssets('chair', { maxSize: [0.5, 0.6, 1] }).map((a) => a.id), ['chair/dining'])
+  const small = searchAssets('chair', { maxSize: [0.5, 0.6, 1] })
+  assert.ok(small.some((a) => a.id === 'chair/dining'))
+  assert.ok(small.every((a) => a.size[0] <= 0.5 && a.size[1] <= 0.6 && a.size[2] <= 1))
 })
 
 test('model sizes come from glTF bounds through node transforms', () => {

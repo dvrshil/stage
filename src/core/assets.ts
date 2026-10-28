@@ -21,9 +21,14 @@ export interface AssetInfo {
   resizable?: boolean
   // Walked over or under, never into.
   passable?: boolean
+  // From the generated part of the library (generated-assets.ts): fetched
+  // on demand, not by a plain `stage assets fetch`.
+  generated?: boolean
 }
 
-export const ASSETS: AssetInfo[] = [
+import { GENERATED_ASSETS } from './generated-assets.ts'
+
+const CURATED: AssetInfo[] = [
   { id: 'sofa/three-seat', model: 'sofa_02', name: 'Three-seat sofa', category: 'sofa', size: [1.81, 0.82, 0.71], tags: ['sofa', 'couch', 'living', 'seating', 'three-seat'] },
   { id: 'sofa/two-seat', model: 'Sofa_01', name: 'Two-seat sofa', category: 'sofa', size: [1.57, 0.66, 0.8], tags: ['sofa', 'couch', 'loveseat', 'living', 'seating'] },
   { id: 'chair/armchair', model: 'modern_arm_chair_01', name: 'Armchair', category: 'chair', size: [0.82, 0.99, 1.02], tags: ['chair', 'armchair', 'living', 'seating', 'reading'] },
@@ -85,6 +90,9 @@ export const ASSETS: AssetInfo[] = [
   { id: 'car/sedan', name: 'Sedan car', category: 'car', size: [1.8, 4.6, 1.45], tags: ['car', 'sedan', 'vehicle', 'garage', 'parking', 'drive'] },
   { id: 'bench/garden', name: 'Garden bench', category: 'bench', size: [1.5, 0.55, 0.85], tags: ['bench', 'garden', 'seat', 'outdoor', 'wood'] },
 ]
+
+// The curated pieces first, then the generated ones that add something new.
+export const ASSETS: AssetInfo[] = [...CURATED, ...GENERATED_ASSETS.filter((g) => !CURATED.some((c) => c.id === g.id || c.model === g.model))]
 
 // Models the engine places itself, rather than the scene file.
 export const FIXTURES = { ceilingLamp: 'modern_ceiling_lamp_01' }

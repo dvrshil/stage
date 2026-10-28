@@ -2,6 +2,8 @@ import { findAsset } from './assets.ts'
 import { DEFAULT_SILL, area, edges, levelsByElevation, pointInPolygon, roomElevation, roomHeight, type Point } from './geometry.ts'
 import { MATERIALS } from './materials.ts'
 import { sliderLayout } from './slider.ts'
+import { stair } from './stairs.ts'
+import { floorToFloor } from './walk.ts'
 import { COLLECTIONS, Scene } from './schema.ts'
 
 // What `stage check` reports. Every problem names an entity and a path,
@@ -321,7 +323,112 @@ function spatial(scene: Scene): Problem[] {
     }
   })
 
+  // Two solid pieces in the same place: a sofa through a table, a bed into
+  // a wardrobe. Rugs, wall pieces, and things on different levels never
+  // collide.
+  const solids = scene.items
+    .map((item, index) => ({ item, index, info: findAsset(item.asset), room: rooms.get(item.room) }))
+    .filter((s) => s.room && !s.info?.passable && !PASSABLE.has(s.item.asset) && !['stairs', 'railing', 'person'].includes(s.info?.category ?? ''))
+    .map((s) => {
+      const size = s.info && !s.info.resizable ? s.info.size : (s.item.size ?? s.info?.size)
+      const base = roomElevation(scene, s.room!) + s.item.elevation
+      return size ? { ...s, box: footprint(s.item, size), bottom: base, top: base + size[2] * s.item.scale } : undefined
+    })
+    .filter((s): s is NonNullable<typeof s> => !!s)
+  for (let i = 0; i < solids.length; i++) {
+    for (let j = i + 1; j < solids.length; j++) {
+      const p = solids[i]
+      const q = solids[j]
+      if (p.bottom >= q.top - 0.02 || q.bottom >= p.top - 0.02) continue
+      // A chair slides under its table, and kitchen units join at corners.
+      const pair = [p.info?.category, q.info?.category]
+      if ((pair.includes('chair') && pair.includes('table')) || (pair[0] === pair[1] && ['kitchen', 'wall'].includes(pair[0] ?? ''))) continue
+      // A couple of centimeters of touching is placement, not a collision.
+      const shrink = (r: Rect) => ({ ...r, halfW: Math.max(0.01, r.halfW - 0.03), halfD: Math.max(0.01, r.halfD - 0.03) })
+      if (!rectanglesOverlap(shrink(p.box), shrink(q.box))) continue
+      problems.push({
+        severity: 'warning',
+        path: `items.${q.index}.at`,
+        entity: q.item.id,
+        message: `"${q.item.id}" runs into "${p.item.id}" (${p.item.room}); move one of them apart.`,
+      })
+    }
+  }
+
+  // Doors and drawers need room to open: 60 cm clear in front of a
+  // wardrobe, cabinet, fridge, or kitchen unit, inside the room.
+  const OPENS = new Set(['wardrobe', 'shelf', 'cabinet', 'kitchen', 'appliance', 'wash'])
+  for (const s of solids) {
+    if (!s.info || !OPENS.has(s.info.category) || s.info.category === 'kitchen' && s.item.asset === 'kitchen/island-two-meter') continue
+    const reach = 0.6
+    const a = (s.item.facing * Math.PI) / 180
+    // Facing turns the piece clockwise from north; its front points this way.
+    const front: Point = [Math.sin(a), Math.cos(a)]
+    const zone: Rect = { x: s.item.at[0] + front[0] * (s.box.halfD + reach / 2), y: s.item.at[1] + front[1] * (s.box.halfD + reach / 2), halfW: s.box.halfW, halfD: reach / 2, angle: s.box.angle }
+    const outside = corners(zone).filter((c) => !pointInPolygon(c, s.room!.floor))
+    if (outside.length > 0) {
+      problems.push({
+        severity: 'warning',
+        path: `items.${s.index}.facing`,
+        entity: s.item.id,
+        message: `"${s.item.id}" faces a wall of "${s.room!.id}" closer than ${reach} m, so it cannot open; turn it with "facing" so its front points into the room.`,
+      })
+      continue
+    }
+    const blocker = solids.find((o) => o !== s && o.room === s.room && !(o.info?.category === 'kitchen' && s.info?.category === 'kitchen') && o.bottom < s.top && o.top > s.bottom + 0.3 && rectanglesOverlap(zone, o.box))
+    if (blocker) {
+      problems.push({
+        severity: 'warning',
+        path: `items.${s.index}.at`,
+        entity: s.item.id,
+        message: `"${blocker.item.id}" stands in front of "${s.item.id}", which needs ${reach} m clear to open.`,
+      })
+    }
+  }
+
+  // A stair climbing under the floor above needs 2 m of headroom on every
+  // step, unless that floor has a well over the stair.
+  const stacked = levelsByElevation(scene)
+  scene.items.forEach((item, index) => {
+    const info = findAsset(item.asset)
+    const room = rooms.get(item.room)
+    if (!info || info.category !== 'stairs' || !room) return
+    const size = item.size ?? info.size
+    const levelIndex = stacked.findIndex((l) => l.id === room.level)
+    const above = stacked[levelIndex + 1]
+    if (!above) return
+    const rise = item.size?.[2] ?? floorToFloor(scene, room.level)
+    const base = roomElevation(scene, room) + item.elevation
+    const a = (item.facing * Math.PI) / 180
+    const c = Math.cos(a)
+    const n = Math.sin(a)
+    const flight = stair(item.asset, size[0] * item.scale, size[1] * item.scale, rise)
+    let worst: { headroom: number; step: number; under: string } | undefined
+    flight.treads.forEach((tread, step) => {
+      const lx = tread.polygon.reduce((sum, p) => sum + p[0], 0) / tread.polygon.length
+      const ly = tread.polygon.reduce((sum, p) => sum + p[1], 0) / tread.polygon.length
+      const world: Point = [item.at[0] + lx * c + ly * n, item.at[1] - lx * n + ly * c]
+      const over = scene.rooms.find((r) => r.level === above.id && !r.well && pointInPolygon(world, r.floor))
+      if (!over) return
+      const headroom = above.elevation - above.slab - (base + tread.top)
+      if (headroom < 2.0 && (!worst || headroom < worst.headroom)) worst = { headroom, step: step + 1, under: over.id }
+    })
+    if (worst) {
+      problems.push({
+        severity: 'warning',
+        path: `items.${index}`,
+        entity: item.id,
+        message: `"${item.id}" has only ${worst.headroom.toFixed(2)} m of headroom at step ${worst.step}, under the floor of "${worst.under}"; make "${worst.under}" a well (or cut it back) over the stair, or move the stair.`,
+      })
+    }
+  })
+
   return problems
+}
+
+// An item's footprint on the plan, as a rotated rectangle.
+function footprint(item: Scene['items'][number], size: [number, number, number]): Rect {
+  return { x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2, halfD: (size[1] * item.scale) / 2, angle: (-item.facing * Math.PI) / 180 }
 }
 
 const PASSABLE = new Set(['rug/area', 'kitchen/wall-cabinets', 'tv/wall', 'screen/projection'])

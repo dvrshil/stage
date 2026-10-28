@@ -85,13 +85,13 @@ export async function availableLock(): Promise<Lock> {
   return { version: 1, textures, skies, models }
 }
 
-async function json(url: string): Promise<any> {
+export async function json(url: string): Promise<any> {
   const response = await fetch(url, { headers: HEADERS })
   if (!response.ok) throw new Error(`${url}: ${response.status} ${response.statusText}`)
   return response.json()
 }
 
-async function download(url: string, file: string, md5: string): Promise<void> {
+export async function download(url: string, file: string, md5: string): Promise<void> {
   const target = join(CACHE, file)
   if (existsSync(target) && createHash('md5').update(await readFile(target)).digest('hex') === md5) return
   const response = await fetch(url, { headers: HEADERS })
@@ -104,75 +104,117 @@ async function download(url: string, file: string, md5: string): Promise<void> {
   await rename(`${target}.tmp`, target)
 }
 
-export async function fetchAssets(resolution = '1k', log: (line: string) => void = () => {}): Promise<Lock> {
-  const lock = await readLock()
-  const textures = [...new Set(Object.values(MATERIALS).map((m) => m.texture).filter((t): t is string => !!t))]
+export interface FetchOptions {
+  resolution?: string
+  // Model or texture ids to fetch, besides the built-in materials and sky.
+  ids?: string[]
+  // Every model the library knows, not just the ones the examples use.
+  all?: boolean
+  log?: (line: string) => void
+}
 
-  for (const id of textures) {
-    const [info, files] = await Promise.all([json(`${API}/info/${id}`), json(`${API}/files/${id}`)])
-    const pick = (key: string) => {
-      const entry = files[key]?.[resolution]?.jpg
-      if (!entry) throw new Error(`${id} has no ${key} map at ${resolution}`)
-      return entry as { url: string; md5: string }
-    }
-    const color = pick('Diffuse')
-    const normal = pick('nor_gl')
-    const arm = pick('arm')
-    const base = `polyhaven/${id}/${resolution}`
-    await Promise.all([
-      download(color.url, `${base}/color.jpg`, color.md5),
-      download(normal.url, `${base}/normal.jpg`, normal.md5),
-      download(arm.url, `${base}/arm.jpg`, arm.md5),
-    ])
-    const [w, h] = (info.dimensions as [number, number] | undefined) ?? [2000, 2000]
-    lock.textures[id] = {
-      source: `https://polyhaven.com/a/${id}`,
-      license: 'CC0',
-      size: [Math.round(w) / 1000, Math.round(h) / 1000],
-      resolution,
-      maps: {
-        color: { file: `${base}/color.jpg`, md5: color.md5 },
-        normal: { file: `${base}/normal.jpg`, md5: normal.md5 },
-        arm: { file: `${base}/arm.jpg`, md5: arm.md5 },
-      },
-    }
-    log(`texture ${id}: ${lock.textures[id].size.join(' x ')} m`)
+export async function fetchTexture(id: string, resolution: string, lock: Lock): Promise<void> {
+  const [info, files] = await Promise.all([json(`${API}/info/${id}`), json(`${API}/files/${id}`)])
+  const pick = (key: string) => {
+    const entry = files[key]?.[resolution]?.jpg
+    if (!entry) throw new Error(`${id} has no ${key} map at ${resolution}`)
+    return entry as { url: string; md5: string }
   }
-
-  const models = [...new Set([...ASSETS.map((a) => a.model).filter((m): m is string => !!m), ...Object.values(FIXTURES)])]
-  for (const id of models) {
-    const files = await json(`${API}/files/${id}`)
-    const entry = files.gltf?.[resolution]?.gltf as { url: string; md5: string; include: Record<string, { url: string; md5: string }> } | undefined
-    if (!entry) throw new Error(`${id} has no glTF at ${resolution}`)
-    const base = `polyhaven/${id}/${resolution}`
-    const gltfFile = `${base}/${id}.gltf`
-    await download(entry.url, gltfFile, entry.md5)
-    const included = Object.entries(entry.include).map(([path, file]) => ({ path: `${base}/${path}`, ...file }))
-    await Promise.all(included.map((file) => download(file.url, file.path, file.md5)))
-    const size = measureGltf(JSON.parse(await readFile(join(CACHE, gltfFile), 'utf8')))
-    lock.models[id] = {
-      source: `https://polyhaven.com/a/${id}`,
-      license: 'CC0',
-      resolution,
-      gltf: { file: gltfFile, md5: entry.md5 },
-      files: included.map((file) => ({ file: file.path, md5: file.md5 })),
-      size,
-    }
-    log(`model ${id}: ${size.join(' x ')} m`)
+  const color = pick('Diffuse')
+  const normal = pick('nor_gl')
+  const arm = pick('arm')
+  const base = `polyhaven/${id}/${resolution}`
+  await Promise.all([
+    download(color.url, `${base}/color.jpg`, color.md5),
+    download(normal.url, `${base}/normal.jpg`, normal.md5),
+    download(arm.url, `${base}/arm.jpg`, arm.md5),
+  ])
+  const [w, h] = (info.dimensions as [number, number] | undefined) ?? [2000, 2000]
+  lock.textures[id] = {
+    source: `https://polyhaven.com/a/${id}`,
+    license: 'CC0',
+    size: [Math.round(w) / 1000, Math.round(h) / 1000],
+    resolution,
+    maps: {
+      color: { file: `${base}/color.jpg`, md5: color.md5 },
+      normal: { file: `${base}/normal.jpg`, md5: normal.md5 },
+      arm: { file: `${base}/arm.jpg`, md5: arm.md5 },
+    },
   }
+}
 
-  // Skies want more pixels than textures: they fill the whole background.
-  const skyResolution = '2k'
-  const files = await json(`${API}/files/${SKY}`)
-  const hdr = files.hdri?.[skyResolution]?.hdr as { url: string; md5: string } | undefined
-  if (!hdr) throw new Error(`${SKY} has no ${skyResolution} HDR`)
-  const file = `polyhaven/${SKY}/${skyResolution}/sky.hdr`
+export async function fetchModel(id: string, resolution: string, lock: Lock): Promise<[number, number, number]> {
+  const files = await json(`${API}/files/${id}`)
+  const entry = files.gltf?.[resolution]?.gltf as { url: string; md5: string; include: Record<string, { url: string; md5: string }> } | undefined
+  if (!entry) throw new Error(`${id} has no glTF at ${resolution}`)
+  const base = `polyhaven/${id}/${resolution}`
+  const gltfFile = `${base}/${id}.gltf`
+  await download(entry.url, gltfFile, entry.md5)
+  const included = Object.entries(entry.include).map(([path, file]) => ({ path: `${base}/${path}`, ...file }))
+  await Promise.all(included.map((file) => download(file.url, file.path, file.md5)))
+  const size = measureGltf(JSON.parse(await readFile(join(CACHE, gltfFile), 'utf8')))
+  lock.models[id] = {
+    source: `https://polyhaven.com/a/${id}`,
+    license: 'CC0',
+    resolution,
+    gltf: { file: gltfFile, md5: entry.md5 },
+    files: included.map((file) => ({ file: file.path, md5: file.md5 })),
+    size,
+  }
+  return size
+}
+
+// Skies want more pixels than textures: they fill the whole background.
+export async function fetchSky(id: string, lock: Lock, resolution = '2k'): Promise<void> {
+  const files = await json(`${API}/files/${id}`)
+  const hdr = files.hdri?.[resolution]?.hdr as { url: string; md5: string } | undefined
+  if (!hdr) throw new Error(`${id} has no ${resolution} HDR`)
+  const file = `polyhaven/${id}/${resolution}/sky.hdr`
   await download(hdr.url, file, hdr.md5)
-  lock.skies[SKY] = { source: `https://polyhaven.com/a/${SKY}`, license: 'CC0', resolution: skyResolution, hdr: { file, md5: hdr.md5 } }
-  log(`sky ${SKY}`)
+  lock.skies[id] = { source: `https://polyhaven.com/a/${id}`, license: 'CC0', resolution, hdr: { file, md5: hdr.md5 } }
+}
 
+export async function writeLock(lock: Lock): Promise<void> {
   mkdirSync(dirname(LOCK_PATH), { recursive: true })
   await writeFile(`${LOCK_PATH}.tmp`, `${JSON.stringify(lock, null, 2)}\n`)
   await rename(`${LOCK_PATH}.tmp`, LOCK_PATH)
+}
+
+// Poly Haven ids a library asset or a scene names: its models, and the
+// texture sets behind its materials.
+export function wanted(ids: string[]): { textures: string[]; models: string[] } {
+  const textures = new Set<string>()
+  const models = new Set<string>()
+  for (const id of ids) {
+    const asset = ASSETS.find((a) => a.id === id)
+    if (asset?.model) models.add(asset.model)
+    else if (MATERIALS[id]?.texture) textures.add(MATERIALS[id].texture!)
+    else if (ASSETS.some((a) => a.model === id)) models.add(id)
+    else textures.add(id)
+  }
+  return { textures: [...textures], models: [...models] }
+}
+
+// The built-in materials and sky always; the models the examples use by
+// default, every model with --all, and any ids asked for.
+export async function fetchAssets(options: FetchOptions = {}): Promise<Lock> {
+  const resolution = options.resolution ?? '1k'
+  const log = options.log ?? (() => {})
+  const lock = await readLock()
+  const asked = wanted(options.ids ?? [])
+  const textures = [...new Set([...Object.values(MATERIALS).map((m) => m.texture).filter((t): t is string => !!t), ...asked.textures])]
+  for (const id of textures) {
+    await fetchTexture(id, resolution, lock)
+    log(`texture ${id}: ${lock.textures[id].size.join(' x ')} m`)
+  }
+  const models = new Set<string>([...Object.values(FIXTURES), ...asked.models])
+  for (const asset of ASSETS) if (asset.model && (options.all || !asset.generated)) models.add(asset.model)
+  for (const id of models) {
+    const size = await fetchModel(id, resolution, lock)
+    log(`model ${id}: ${size.join(' x ')} m`)
+  }
+  await fetchSky(SKY, lock)
+  log(`sky ${SKY}`)
+  await writeLock(lock)
   return lock
 }

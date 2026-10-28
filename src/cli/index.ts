@@ -33,7 +33,7 @@ Commands that need no display:
   show <scene> [--camera id] [--level id] [--focus id]
                                        Point every open viewer at a camera, level, or entity
   assets [words...] [--category c]     Search the asset library
-  assets fetch [--resolution 1k]       Download the CC0 textures and sky into the local cache
+  assets fetch [ids...] [--all]        Download CC0 textures, models and the sky into the local cache
   materials                            List the built-in materials
   fmt <scene>                          Rewrite the scene in canonical form
   schema                               Print the scene format as JSON Schema
@@ -78,6 +78,7 @@ async function main(argv: string[]): Promise<number> {
       category: { type: 'string' },
       port: { type: 'string' },
       resolution: { type: 'string' },
+      all: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   })
@@ -193,8 +194,8 @@ async function main(argv: string[]): Promise<number> {
     case 'assets': {
       if (positionals[0] === 'fetch') {
         const { fetchAssets, CACHE } = await import('./assets.ts')
-        const lock = await fetchAssets((values.resolution as string | undefined) ?? '1k', json ? undefined : (line) => print(line))
-        json ? print({ ok: true, cache: CACHE, textures: Object.keys(lock.textures), skies: Object.keys(lock.skies) }) : print(`Fetched into ${CACHE}`)
+        const lock = await fetchAssets({ resolution: values.resolution as string | undefined, ids: positionals.slice(1), all: values.all === true, log: json ? undefined : (line) => print(line) })
+        json ? print({ ok: true, cache: CACHE, textures: Object.keys(lock.textures), skies: Object.keys(lock.skies), models: Object.keys(lock.models) }) : print(`Fetched into ${CACHE}`)
         return 0
       }
       const found = searchAssets(positionals.join(' '), { category: values.category as string | undefined })
