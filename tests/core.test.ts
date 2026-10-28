@@ -433,3 +433,17 @@ test('query objects gives the world placement of a part', () => {
   assert.deepEqual(crate.position.map((n) => Math.round(n * 100) / 100), [2, -1, 0])
   assert.deepEqual(crate.size, [1, 1, 1])
 })
+
+// Models from the open libraries: the zip reader and the glb measurer.
+import { measureFile, readGltfJson, unzip } from '../src/cli/models.ts'
+
+test('a zip of glTF unpacks, and a glb measures', async () => {
+  const entries = unzip(await readFile(new URL('./fixtures/box.zip', import.meta.url)))
+  assert.deepEqual(entries.map((e) => e.name).sort(), ['scene/box.glb', 'scene/readme.txt'])
+  const glb = entries.find((e) => e.name.endsWith('.glb'))!
+  const json = JSON.parse(JSON.stringify(await readGltfJson(new URL('./fixtures/box.glb', import.meta.url).pathname)))
+  assert.equal(json.asset.version, '2.0')
+  assert.equal(glb.data.toString('ascii', 0, 4), 'glTF')
+  // Width, depth, height: the box is 1 wide (x), 0.5 deep (z), 1 tall (y).
+  assert.deepEqual(await measureFile(new URL('./fixtures/box.glb', import.meta.url).pathname), [1, 0.5, 1])
+})

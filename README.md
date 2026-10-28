@@ -54,6 +54,14 @@ patterns drawn in code and furniture to pieces built from primitives.
 `npm install -g .` puts a `stage` command on your path; the examples
 below spell it out as `node bin/stage.js`.
 
+For anything the library lacks, `find_model` searches the open model
+libraries: Poly Haven (CC0 scans), Sketchfab (CC0 and CC-BY, the largest),
+the Icosa Gallery (the Google Poly archive), and Poly Pizza (low-poly
+packs). The first three need no key; Poly Pizza wants a free key in
+`POLY_PIZZA_KEY`, and downloading from Sketchfab wants your free account
+token in `SKETCHFAB_TOKEN`. Every fetched model lands beside the scene
+with its license and author recorded, and `share` writes the credits.
+
 ## Use it with an agent
 
 Stage is an MCP server. One line adds it to Claude Code:

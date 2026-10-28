@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { inflateRawSync } from 'node:zlib'
 import { existsSync, mkdirSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -22,6 +23,9 @@ export interface ModelHit {
   triangles?: number
   // Width, depth, height in meters when the source knows.
   size?: [number, number, number]
+  // What the source needs to fetch it, kept from the search.
+  download?: string
+  formats?: unknown[]
 }
 
 export interface Fetched {
@@ -39,10 +43,21 @@ export interface ModelSource {
   name: string
   // What the agent should know: licenses, what it is good for, the key.
   about: string
-  // The environment variable holding a key, when the source needs one.
+  // The environment variable holding a key, when the source needs one,
+  // and whether search works without it.
   key?: string
-  search(words: string, limit: number): Promise<ModelHit[]>
+  searchWithoutKey?: boolean
+  headers?: () => Record<string, string>
+  search(words: string, limit: number, options: SearchOptions): Promise<ModelHit[]>
+  // One model by the id search gave, for a fetch in a later session.
+  get(id: string): Promise<ModelHit | undefined>
   fetch(hit: ModelHit, folder: string): Promise<string>
+}
+
+export interface SearchOptions {
+  // Only public-domain models, or any Creative Commons license that allows
+  // use with credit.
+  license: 'cc0' | 'any'
 }
 
 const HEADERS = { 'user-agent': 'stage/0.1 (https://github.com/dvrshil/stage; model search)' }
@@ -92,34 +107,46 @@ export async function measureFile(path: string): Promise<[number, number, number
 }
 
 // --- Poly Haven: CC0 scans, photographic quality, heavy; furniture,
-// props, plants, rocks, vehicles. No key.
+// props, plants, rocks, vehicles. No key. Its terms ask for a named
+// user agent and a visible credit where results are shown.
 const POLYHAVEN = 'https://api.polyhaven.com'
+function polyhavenHit(id: string, a: any): ModelHit {
+  const mm = a.dimensions as [number, number, number] | undefined
+  return {
+    source: 'polyhaven',
+    id,
+    name: a.name,
+    license: 'CC0',
+    credit: Object.keys(a.authors ?? {}).join(', '),
+    url: `https://polyhaven.com/a/${id}`,
+    thumbnail: `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=256&height=256`,
+    triangles: a.polycount,
+    size: mm ? ([mm[0] / 1000, mm[1] / 1000, mm[2] / 1000].map((n) => Math.round(n * 100) / 100) as [number, number, number]) : undefined,
+  }
+}
 let polyhavenIndex: Promise<Record<string, any>> | undefined
 const polyhaven: ModelSource = {
   id: 'polyhaven',
   name: 'Poly Haven',
-  about: 'CC0 photoscanned models (furniture, props, plants, rocks, vehicles), high quality and heavy; no key needed',
+  about: 'about 520 CC0 photoscanned models (furniture, props, plants, rocks, a few vehicles), realistic and heavy, with real sizes; no key',
   async search(words, limit) {
     polyhavenIndex ??= getJson(`${POLYHAVEN}/assets?type=models`)
-    const index = await polyhavenIndex
-    const terms = words.toLowerCase().split(/\s+/).filter(Boolean)
-    const hits: (ModelHit & { score: number })[] = []
-    for (const [id, a] of Object.entries<any>(index)) {
-      const haystack = `${id} ${a.name} ${(a.tags ?? []).join(' ')} ${(a.categories ?? []).join(' ')}`.toLowerCase()
-      const score = terms.reduce((n, t) => n + (haystack.includes(t) ? 1 : 0), 0)
-      if (terms.length && score < terms.length) continue
-      hits.push({
-        source: 'polyhaven',
-        id,
-        name: a.name,
-        license: 'CC0',
-        credit: Object.keys(a.authors ?? {}).join(', '),
-        url: `https://polyhaven.com/a/${id}`,
-        thumbnail: `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=256&height=256`,
-        score: score + Math.min(1, (a.download_count ?? 0) / 1e6),
-      })
+    const [index, ranked] = await Promise.all([polyhavenIndex, getJson(`${POLYHAVEN}/search?q=${encodeURIComponent(words)}&t=models`).catch(() => [])])
+    const list = Array.isArray(ranked) ? ranked : (ranked?.results ?? [])
+    const order: string[] = list.map((r: any) => r.slug ?? r.id).filter((id: string) => index[id])
+    if (order.length === 0) {
+      const terms = words.toLowerCase().split(/\s+/).filter(Boolean)
+      for (const [id, a] of Object.entries<any>(index)) {
+        const haystack = `${id} ${a.name} ${(a.tags ?? []).join(' ')} ${(a.categories ?? []).join(' ')}`.toLowerCase()
+        if (terms.every((t) => haystack.includes(t))) order.push(id)
+      }
     }
-    return hits.sort((p, q) => q.score - p.score).slice(0, limit)
+    return order.slice(0, limit).map((id) => polyhavenHit(id, index[id]))
+  },
+  async get(id) {
+    polyhavenIndex ??= getJson(`${POLYHAVEN}/assets?type=models`)
+    const a = (await polyhavenIndex)[id]
+    return a ? polyhavenHit(id, a) : undefined
   },
   async fetch(hit, folder) {
     const files = await getJson(`${POLYHAVEN}/files/${hit.id}`)
@@ -132,7 +159,182 @@ const polyhaven: ModelSource = {
   },
 }
 
-export const SOURCES: ModelSource[] = [polyhaven]
+// --- Poly Pizza: thousands of low-poly CC0 and CC-BY pieces (the Kenney
+// and Quaternius packs among them), one glb each. Free key from
+// poly.pizza/settings/api in POLY_PIZZA_KEY.
+const polypizzaHit = (m: any): ModelHit => ({
+  source: 'polypizza',
+  id: String(m.ID),
+  name: m.Title,
+  license: m.Licence ?? 'CC-BY 3.0',
+  credit: m.Attribution ?? m.Creator?.Username ?? '',
+  url: `https://poly.pizza/m/${m.ID}`,
+  thumbnail: m.Thumbnail,
+  triangles: m['Tri Count'],
+  download: m.Download,
+})
+const polypizza: ModelSource = {
+  id: 'polypizza',
+  name: 'Poly Pizza',
+  about: 'thousands of low-poly stylised models (household, vehicles, animals, food, characters), CC0 and CC-BY, one small glb each; free key in POLY_PIZZA_KEY',
+  key: 'POLY_PIZZA_KEY',
+  headers: () => ({ 'x-auth-token': process.env.POLY_PIZZA_KEY ?? '' }),
+  async search(words, limit, { license }) {
+    const url = `https://api.poly.pizza/v1.1/search/${encodeURIComponent(words)}?Limit=${Math.min(32, limit)}${license === 'cc0' ? '&License=1' : ''}`
+    const data = await getJson(url, this.headers!())
+    return ((data.results ?? []) as any[]).map(polypizzaHit)
+  },
+  async get(id) {
+    const m = await getJson(`https://api.poly.pizza/v1.1/model/${encodeURIComponent(id)}`, this.headers!()).catch(() => undefined)
+    return m?.ID !== undefined ? polypizzaHit(m) : undefined
+  },
+  async fetch(hit, folder) {
+    const download = (hit as ModelHit & { download?: string }).download
+    if (!download) throw new Error(`${hit.id} has no download`)
+    const file = join('models', 'polypizza', `${slug(hit.name)}-${hit.id}.glb`)
+    await saveTo(download, join(folder, file), this.headers!())
+    return file
+  },
+}
+
+// --- Sketchfab: the largest catalogue. Search is open; downloading needs
+// a personal API token (Settings, Password & API) in SKETCHFAB_TOKEN. A
+// download is a zip of glTF, unpacked beside the scene.
+function sketchfabHit(m: any): ModelHit {
+  const thumbs = ((m.thumbnails?.images ?? []) as { url: string; width: number }[]).sort((a, b) => a.width - b.width)
+  const thumb = thumbs.find((t) => t.width >= 200) ?? thumbs.at(-1)
+  return {
+    source: 'sketchfab',
+    id: m.uid,
+    name: m.name,
+    license: m.license?.label ?? 'CC-BY',
+    credit: `${m.user?.displayName ?? m.user?.username ?? ''} (${m.viewerUrl})`,
+    url: m.viewerUrl,
+    thumbnail: thumb?.url,
+    triangles: m.faceCount,
+  }
+}
+const sketchfab: ModelSource = {
+  id: 'sketchfab',
+  name: 'Sketchfab',
+  about: 'the largest catalogue, CC0 and CC-BY downloadable models of everything (often 100k+ faces with big textures; scans, products, creatures, vehicles); search needs no key, downloading needs your free account token in SKETCHFAB_TOKEN',
+  key: 'SKETCHFAB_TOKEN',
+  searchWithoutKey: true,
+  headers: (): Record<string, string> => (process.env.SKETCHFAB_TOKEN ? { authorization: `Token ${process.env.SKETCHFAB_TOKEN}` } : {}),
+  async search(words, limit, { license }) {
+    const licenses = license === 'cc0' ? ['cc0'] : ['cc0', 'by']
+    const pages = await Promise.all(licenses.map((l) => getJson(`https://api.sketchfab.com/v3/search?type=models&q=${encodeURIComponent(words)}&downloadable=true&license=${l}&count=${Math.min(24, limit)}&archives_max_face_count=500000`).catch(() => ({ results: [] }))))
+    const seen = new Set<string>()
+    const hits: ModelHit[] = []
+    for (const page of pages) {
+      for (const m of (page.results ?? []) as any[]) {
+        if (seen.has(m.uid)) continue
+        seen.add(m.uid)
+        hits.push(sketchfabHit(m))
+      }
+    }
+    return hits.slice(0, limit)
+  },
+  async get(id) {
+    const m = await getJson(`https://api.sketchfab.com/v3/models/${encodeURIComponent(id)}`).catch(() => undefined)
+    return m?.uid ? sketchfabHit(m) : undefined
+  },
+  async fetch(hit, folder) {
+    if (!process.env.SKETCHFAB_TOKEN) throw new Error('downloading from Sketchfab needs SKETCHFAB_TOKEN: your API token from sketchfab.com/settings/password, set in the environment of the MCP server')
+    const links = await getJson(`https://api.sketchfab.com/v3/models/${hit.id}/download`, this.headers!())
+    const archive = links.glb?.url ? { url: links.glb.url, kind: 'glb' } : links.gltf?.url ? { url: links.gltf.url, kind: 'gltf' } : undefined
+    if (!archive) throw new Error(`${hit.id}: Sketchfab offered no glTF archive`)
+    const { data } = await getBytes(archive.url)
+    const base = join('models', 'sketchfab', `${slug(hit.name)}-${hit.id.slice(0, 8)}`)
+    const entries = unzip(data)
+    let main: string | undefined
+    for (const entry of entries) {
+      const path = join(folder, base, entry.name)
+      if (!resolve(path).startsWith(resolve(folder, base))) continue
+      mkdirSync(dirname(path), { recursive: true })
+      await writeFile(path, entry.data)
+      if (/\.(glb|gltf)$/i.test(entry.name) && (!main || entry.name.endsWith('.glb'))) main = entry.name
+    }
+    if (!main) throw new Error(`${hit.id}: the archive held no .gltf or .glb`)
+    return `${base}/${main}`
+  },
+}
+
+// --- Icosa Gallery: the Google Poly archive, 140k low-poly models,
+// nearly all CC-BY 3.0. No key. Files often come through the Internet
+// Archive, slowly.
+const ICOSA_LICENSE: Record<string, string> = { CREATIVE_COMMONS_BY: 'CC-BY', CREATIVE_COMMONS_0: 'CC0', CREATIVE_COMMONS_BY_ND: 'CC-BY-ND' }
+const icosaUsable = (a: any) => a.license !== 'CREATIVE_COMMONS_BY_ND' && (a.formats ?? []).some((f: any) => f.formatType === 'GLB' || f.formatType === 'GLTF2')
+const icosaHit = (a: any): ModelHit => ({
+  source: 'icosa',
+  id: a.assetId,
+  name: a.displayName,
+  license: `${ICOSA_LICENSE[a.license] ?? a.license} ${a.licenseVersion ?? ''}`.trim(),
+  credit: `${a.authorName} (https://icosa.gallery/view/${a.assetId})`,
+  url: `https://icosa.gallery/view/${a.assetId}`,
+  thumbnail: a.thumbnail?.url,
+  triangles: a.triangleCount,
+  formats: a.formats,
+})
+const icosa: ModelSource = {
+  id: 'icosa',
+  name: 'Icosa Gallery',
+  about: 'the Google Poly archive, 140k low-poly models (household, animals, vehicles, scenes), nearly all CC-BY 3.0 with a few CC0; no key; downloads can be slow',
+  async search(words, limit, { license }) {
+    const url = `https://api.icosa.gallery/v1/assets?keywords=${encodeURIComponent(words)}&format=GLTF2&license=${license === 'cc0' ? 'CREATIVE_COMMONS_0' : 'ALL_CC'}&orderBy=BEST&pageSize=${Math.min(100, limit)}`
+    const data = await getJson(url)
+    return ((data.assets ?? []) as any[]).filter(icosaUsable).map(icosaHit)
+  },
+  async get(id) {
+    const a = await getJson(`https://api.icosa.gallery/v1/assets/${encodeURIComponent(id)}`).catch(() => undefined)
+    return a?.assetId && icosaUsable(a) ? icosaHit(a) : undefined
+  },
+  async fetch(hit, folder) {
+    const formats = ((hit as ModelHit & { formats?: any[] }).formats ?? []) as any[]
+    const glb = formats.find((f) => f.formatType === 'GLB' && f.root?.url)
+    const gltf = formats.find((f) => f.formatType === 'GLTF2' && f.root?.url)
+    const base = join('models', 'icosa', `${slug(hit.name)}-${hit.id}`)
+    if (glb && !gltf) {
+      await saveTo(glb.root.url, join(folder, base, 'model.glb'))
+      return `${base}/model.glb`
+    }
+    const chosen = gltf ?? glb
+    if (!chosen) throw new Error(`${hit.id}: no glTF format`)
+    const rootName = chosen.root.relativePath ?? 'model.gltf'
+    await saveTo(chosen.root.url, join(folder, base, rootName))
+    await Promise.all(((chosen.resources ?? []) as any[]).map((r) => saveTo(r.url, join(folder, base, r.relativePath ?? r.url.split('/').pop()))))
+    return `${base}/${rootName}`
+  },
+}
+
+// A zip, as the Sketchfab archives come: stored or deflated entries,
+// read from the central directory.
+export function unzip(data: Buffer): { name: string; data: Buffer }[] {
+  let end = data.length - 22
+  while (end >= 0 && data.readUInt32LE(end) !== 0x06054b50) end--
+  if (end < 0) throw new Error('not a zip file')
+  const count = data.readUInt16LE(end + 10)
+  let at = data.readUInt32LE(end + 16)
+  const entries: { name: string; data: Buffer }[] = []
+  for (let i = 0; i < count; i++) {
+    if (data.readUInt32LE(at) !== 0x02014b50) break
+    const method = data.readUInt16LE(at + 10)
+    const compressed = data.readUInt32LE(at + 20)
+    const nameLength = data.readUInt16LE(at + 28)
+    const extraLength = data.readUInt16LE(at + 30)
+    const commentLength = data.readUInt16LE(at + 32)
+    const local = data.readUInt32LE(at + 42)
+    const name = data.toString('utf8', at + 46, at + 46 + nameLength)
+    at += 46 + nameLength + extraLength + commentLength
+    if (name.endsWith('/')) continue
+    const start = local + 30 + data.readUInt16LE(local + 26) + data.readUInt16LE(local + 28)
+    const body = data.subarray(start, start + compressed)
+    entries.push({ name, data: method === 8 ? inflateRawSync(body) : Buffer.from(body) })
+  }
+  return entries
+}
+
+export const SOURCES: ModelSource[] = [polyhaven, polypizza, sketchfab, icosa]
 
 export function sourceById(id: string): ModelSource {
   const found = SOURCES.find((s) => s.id === id)
@@ -141,13 +343,13 @@ export function sourceById(id: string): ModelSource {
 }
 
 // Sources that can be used now: the ones needing a key only when it is set.
-export const available = () => SOURCES.filter((s) => !s.key || process.env[s.key])
+export const available = () => SOURCES.filter((s) => !s.key || s.searchWithoutKey || process.env[s.key])
 
-export async function findModels(words: string, options: { source?: string; limit?: number } = {}): Promise<{ hits: ModelHit[]; skipped: string[] }> {
+export async function findModels(words: string, options: { source?: string; limit?: number; license?: 'cc0' | 'any' } = {}): Promise<{ hits: ModelHit[]; skipped: string[] }> {
   const limit = options.limit ?? 8
   const sources = options.source ? [sourceById(options.source)] : available()
-  const skipped = SOURCES.filter((s) => !sources.includes(s)).map((s) => `${s.name} (set ${s.key})`)
-  const results = await Promise.allSettled(sources.map((s) => s.search(words, limit)))
+  const skipped = SOURCES.filter((s) => !sources.includes(s) && !options.source).map((s) => `${s.name} (set ${s.key})`)
+  const results = await Promise.allSettled(sources.map((s) => s.search(words, limit, { license: options.license ?? 'any' })))
   const hits: ModelHit[] = []
   for (let round = 0; hits.length < limit; round++) {
     let any = false
@@ -160,16 +362,28 @@ export async function findModels(words: string, options: { source?: string; limi
     }
     if (!any) break
   }
-  for (const result of results) if (result.status === 'rejected') skipped.push(String((result.reason as Error).message))
+  results.forEach((result, i) => {
+    if (result.status === 'rejected') skipped.push(`${sources[i].name}: ${String((result.reason as Error).message)}`)
+  })
   return { hits, skipped }
+}
+
+// A hit by id: the recent search results first, then the source itself.
+const recent = new Map<string, ModelHit>()
+export const remember = (hits: ModelHit[]) => hits.forEach((h) => recent.set(`${h.source}:${h.id}`, h))
+async function findById(adapter: ModelSource, id: string): Promise<ModelHit> {
+  const known = recent.get(`${adapter.id}:${id}`) ?? (await adapter.get(id))
+  if (known) return known
+  const hits = await adapter.search(id, 50, { license: 'any' })
+  const hit = hits.find((h) => h.id === id) ?? hits.find((h) => slug(h.id) === slug(id))
+  if (!hit) throw new Error(`${adapter.name} has no model with id "${id}"; find_model first and use the id it gives.`)
+  return hit
 }
 
 // Fetch one hit beside the scene file and measure it.
 export async function fetchModelBesideScene(scenePath: string, source: string, id: string): Promise<Fetched> {
   const adapter = sourceById(source)
-  const hits = await adapter.search(id, 50)
-  const hit = hits.find((h) => h.id === id) ?? hits.find((h) => slug(h.id) === slug(id))
-  if (!hit) throw new Error(`${adapter.name} has no model with id "${id}"; find_model first and use the id it gives.`)
+  const hit = await findById(adapter, id)
   const folder = dirname(resolve(scenePath))
   const file = await adapter.fetch(hit, folder)
   const size = await measureFile(join(folder, file))
@@ -180,7 +394,7 @@ export async function fetchModelBesideScene(scenePath: string, source: string, i
 export async function thumbnailImage(hit: ModelHit): Promise<{ data: string; mimeType: string } | undefined> {
   if (!hit.thumbnail) return undefined
   try {
-    const { data, type } = await getBytes(hit.thumbnail)
+    const { data, type } = await getBytes(hit.thumbnail, SOURCES.find((s) => s.id === hit.source)?.headers?.() ?? {})
     const mimeType = type.split(';')[0].trim()
     if (!mimeType.startsWith('image/')) return undefined
     return { data: data.toString('base64'), mimeType }

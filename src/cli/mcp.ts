@@ -12,7 +12,7 @@ import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, jsonSchema, type Collection } from '../core/schema.ts'
 import { format, readScene, writeScene } from '../core/store.ts'
 import { EXAMPLES, ROOT, SCHEMAS, checkScene, control, newScene, openViewer, removeEntity, upsert } from './ops.ts'
-import { SOURCES, available, fetchModelBesideScene, findModels, thumbnailImage } from './models.ts'
+import { SOURCES, available, fetchModelBesideScene, findModels, remember, thumbnailImage } from './models.ts'
 import { Renderer } from './render.ts'
 import { VERSION } from './server.ts'
 
@@ -298,15 +298,17 @@ export async function runMcp(): Promise<void> {
         words: z.string().describe('What to look for, e.g. "rubber duck", "office chair", "oak tree"'),
         source: z.enum(SOURCES.map((s) => s.id) as [string, ...string[]]).optional().describe('One source; every available one by default'),
         limit: z.number().int().min(1).max(20).default(8),
+        license: z.enum(['cc0', 'any']).default('any').describe('cc0: public domain only; any: also CC-BY, which the scene credits'),
         thumbnails: z.boolean().default(true).describe('Return each hit\'s thumbnail as an image'),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    ({ words, source, limit, thumbnails }) =>
+    ({ words, source, limit, license, thumbnails }) =>
       guarded(async () => {
-        const { hits, skipped } = await findModels(words, { source, limit })
+        const { hits, skipped } = await findModels(words, { source, limit, license })
+        remember(hits)
         const lines = hits.map((h, i) => `${i + 1}. ${h.source}:${h.id}  ${h.name}  [${h.license}${h.credit ? `, ${h.credit}` : ''}]${h.triangles ? `  ${h.triangles.toLocaleString()} tris` : ''}${h.size ? `  ${h.size.join(' × ')} m` : ''}  ${h.url}`)
-        const content: Content[] = [text(hits.length ? `${lines.join('\n')}\n\nfetch_model with source and id places one. Sources searched: ${available().map((s) => s.id).join(', ')}.${skipped.length ? ` Not searched: ${skipped.join('; ')}.` : ''}` : `nothing found for "${words}"${skipped.length ? ` (not searched: ${skipped.join('; ')})` : ''}; try other words, or build it from primitives.`)]
+        const content: Content[] = [text(hits.length ? `${lines.join('\n')}\n\nfetch_model with source and id places one. Sources searched: ${available().map((s) => s.id).join(', ')}${hits.some((h) => h.source === 'polyhaven') ? ' (powered by Poly Haven)' : ''}.${skipped.length ? ` Not searched: ${skipped.join('; ')}.` : ''}` : `nothing found for "${words}"${skipped.length ? ` (not searched: ${skipped.join('; ')})` : ''}; try other words, or build it from primitives.`)]
         if (thumbnails) {
           const images = await Promise.all(hits.map((h) => thumbnailImage(h)))
           images.forEach((image, i) => {
@@ -345,10 +347,12 @@ export async function runMcp(): Promise<void> {
     ({ scene, source, id, place }) =>
       guarded(async () => {
         const fetched = await fetchModelBesideScene(resolve(scene), source, id)
-        if (!place) return [text({ ...fetched, next: `set objects {"id": ..., "kind": "model", "file": "${fetched.file}", "size": ${JSON.stringify(fetched.size)}, "at": [x, y, z]}` })]
+        const biggest = Math.max(...fetched.size)
+        const note = biggest > 12 || biggest < 0.03 ? ` The model's own size is ${fetched.size.join(' × ')} m, which looks like the wrong units; pass place.size (or set "size") to fit it to the size the real thing has.` : ''
+        if (!place) return [text({ ...fetched, note: note || undefined, next: `set objects {"id": ..., "kind": "model", "file": "${fetched.file}", "size": ${JSON.stringify(fetched.size)}, "at": [x, y, z]}` })]
         const entity = { id: place.id, kind: 'model', file: fetched.file, size: place.size ?? fetched.size, at: place.at, facing: place.facing, parent: place.parent, room: place.room, label: place.label, source: fetched.source, license: fetched.license, credit: fetched.credit || undefined }
         const { replaced, result } = await upsert(scene, 'objects', JSON.parse(JSON.stringify(entity)))
-        return [text(`${replaced ? 'replaced' : 'added'} ${place.id}: ${fetched.file}, ${fetched.size.join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''}\n${problems(result)}`)]
+        return [text(`${replaced ? 'replaced' : 'added'} ${place.id}: ${fetched.file}, ${(place.size ?? fetched.size).join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''}.${place.size ? '' : note}\n${problems(result)}`)]
       }),
   )
 

@@ -91,11 +91,15 @@ stands in rooms, levels stack. A scene with no rooms is fine.
 - Build order for a thing: a `group` at its place, the biggest part first,
   then the rest in the group's frame. Render `orbit` and a camera close in.
 - Something the library lacks (a bicycle, a dinosaur, a laptop, a tree):
-  `find_model` searches the open model libraries and shows thumbnails;
+  `find_model` searches the open model libraries (Poly Haven's CC0 scans,
+  Sketchfab, the Icosa Gallery, Poly Pizza when its key is set) and shows
+  thumbnails;
   look at them, then `fetch_model` with `place` puts the one you pick in
   the scene as a `model` object, measured, with its license and author
   recorded. Search first; build from primitives when nothing fits or the
   thing is simple and geometric; never guess at a file that is not there.
+  A fetched model that measures meters across when it should be
+  centimeters came in the wrong units: give it a `size`.
 
 ## Several floors
 

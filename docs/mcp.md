@@ -56,6 +56,27 @@ with the same `command` and `args`.
 Renders need Chromium or Chrome on the machine; set `STAGE_CHROMIUM` to its
 path if it is somewhere unusual.
 
+**Model search keys.** `find_model` searches Poly Haven, Sketchfab and the
+Icosa Gallery with no key. Two more things need free keys in the server's
+environment: `POLY_PIZZA_KEY` (an app key from poly.pizza/settings/api)
+turns on Poly Pizza, and `SKETCHFAB_TOKEN` (your API token from
+sketchfab.com/settings/password) lets Sketchfab models be downloaded, not
+just found. In a JSON config they go in `env`:
+
+```json
+{
+  "mcpServers": {
+    "stage": {
+      "command": "node",
+      "args": ["/path/to/stage/bin/stage.js", "mcp"],
+      "env": { "POLY_PIZZA_KEY": "...", "SKETCHFAB_TOKEN": "..." }
+    }
+  }
+}
+```
+
+With Claude Code: `claude mcp add --scope user -e POLY_PIZZA_KEY=... -e SKETCHFAB_TOKEN=... stage -- node /path/to/stage/bin/stage.js mcp`.
+
 ## What the server exposes
 
 **Instructions.** The agent guide (`src/skill.md`) is sent as the server's
