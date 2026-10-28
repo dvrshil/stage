@@ -1,5 +1,6 @@
 import { findAsset } from './assets.ts'
-import { alongWall, levelsByElevation, pointInPolygon, roomElevation, wallPieces, walls, type Point } from './geometry.ts'
+import { alongWall, levelsByElevation, pointInPolygon, roomElevation, wallPieces, walls, type Point, sceneBounds } from './geometry.ts'
+import { footprintCorners, placeObjects } from './objects.ts'
 import type { Scene } from './schema.ts'
 import { stair, type Stair } from './stairs.ts'
 import { RAIL_OFFSET, sliderLayout } from './slider.ts'
@@ -58,6 +59,23 @@ export function obstacles(scene: Scene): Obstacles {
     }
     if (PASSABLE.has(item.asset) || info?.passable) continue
     result.solids.push({ x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2, halfD: (size[1] * item.scale) / 2, angle, bottom: base, top: base + size[2] * item.scale })
+  }
+  // Free objects: a solid one stops a person, and the flat top of anything
+  // is a place to stand when it is within a step. A plane is only a top.
+  let outside = scene.rooms.length === 0
+  for (const placed of placeObjects(scene)) {
+    const { object, footprint, box } = placed
+    if (!object.room) outside = true
+    if (object.kind === 'group' || !object.solid) continue
+    if (object.kind !== 'plane') result.solids.push({ ...footprint, bottom: box.min[2], top: box.max[2] })
+    if (placed.flat) result.floors.push({ polygon: footprintCorners(footprint), elevation: box.max[2] })
+  }
+  // With no rooms, or objects standing outside them, the ground itself
+  // holds a person up, well past everything.
+  if (outside) {
+    const b = sceneBounds(scene)
+    const pad = 12
+    result.floors.push({ polygon: [[b.min[0] - pad, b.min[1] - pad], [b.max[0] + pad, b.min[1] - pad], [b.max[0] + pad, b.max[1] + pad], [b.min[0] - pad, b.max[1] + pad]], elevation: 0 })
   }
   return result
 }
@@ -185,12 +203,13 @@ export function ground(p: Point, { floors, stairs }: Obstacles, foot: number): n
       bestGap = gap - 0.2
     }
   }
+  // Of the floors within a step, the highest: a low platform or a box top
+  // is stepped onto, and stepping off it lands on the ground below.
+  let highest: number | undefined
   for (const f of floors) {
-    const gap = Math.abs(f.elevation - foot)
-    if (gap < bestGap && pointInPolygon(p, f.polygon)) {
-      best = f.elevation
-      bestGap = gap
-    }
+    if (Math.abs(f.elevation - foot) >= STEP || !pointInPolygon(p, f.polygon)) continue
+    if (highest === undefined || f.elevation > highest) highest = f.elevation
   }
+  if (highest !== undefined && Math.abs(highest - foot) < bestGap) best = highest
   return best
 }

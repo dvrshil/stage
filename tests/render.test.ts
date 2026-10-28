@@ -47,7 +47,7 @@ test('every example matches its golden renders', async () => {
   const { meanDifference } = await import('./png.ts')
   const dir = new URL('./golden/', import.meta.url).pathname
   await mkdir(dir, { recursive: true })
-  for (const example of ['flat', 'flat-with-bedroom', 'two-storey']) {
+  for (const example of ['flat', 'flat-with-bedroom', 'two-storey', 'desk']) {
     for (const camera of ['orbit', 'plan']) {
       const path = `${dir}${example}-${camera}.png`
       const png = await renderer.render(new URL(`../examples/${example}/scene.json`, import.meta.url).pathname, { camera, width: 480, height: 270, timeout: 120000 })

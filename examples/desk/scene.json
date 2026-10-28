@@ -1,0 +1,28 @@
+{
+  "stage": "0.1",
+  "name": "A desk, a computer, and a rubber duck",
+  "objects": [
+    { "id": "slab", "kind": "plane", "size": [8, 6], "material": "concrete" },
+    { "id": "desk", "kind": "asset", "asset": "table/desk" },
+    { "id": "chair", "kind": "asset", "at": [0, -0.95, 0], "facing": 0, "asset": "chair/schoolchair-01" },
+    { "id": "monitor", "kind": "group", "parent": "desk", "at": [0, 0.2, 0.79] },
+    { "id": "monitor-foot", "kind": "cylinder", "parent": "monitor", "radius": 0.12, "height": 0.02, "color": "#2b2b2e", "roughness": 0.35, "metalness": 0.4 },
+    { "id": "monitor-post", "kind": "box", "parent": "monitor", "at": [0, 0, 0.02], "size": [0.05, 0.04, 0.3], "color": "#2b2b2e", "roughness": 0.35, "metalness": 0.4 },
+    { "id": "monitor-panel", "kind": "box", "parent": "monitor", "at": [0, -0.01, 0.22], "size": [0.62, 0.025, 0.36], "color": "#1d1d20", "roughness": 0.5 },
+    { "id": "monitor-screen", "kind": "box", "parent": "monitor", "at": [0, -0.025, 0.24], "size": [0.58, 0.004, 0.32], "color": "#1b2c4a", "roughness": 0.2, "glow": "#3a7bd5" },
+    { "id": "keyboard", "kind": "box", "parent": "desk", "at": [0, -0.18, 0.79], "size": [0.44, 0.15, 0.02], "color": "#3a3a3c", "roughness": 0.7 },
+    { "id": "mouse", "kind": "sphere", "parent": "desk", "at": [0.34, -0.18, 0.79], "scale": [1, 1.7, 1.1], "radius": 0.03, "color": "#d8d6d0", "roughness": 0.5 },
+    { "id": "books", "kind": "asset", "parent": "desk", "at": [-0.45, 0.3, 0.79], "facing": 0, "asset": "decor/book-encyclopedia-set-01" },
+    { "id": "lamp", "kind": "asset", "parent": "desk", "at": [-0.8, 0.25, 0.79], "facing": 150, "asset": "lamp/desk" },
+    { "id": "duck", "kind": "group", "parent": "desk", "at": [0.72, 0.22, 0.79], "facing": 215 },
+    { "id": "duck-body", "kind": "sphere", "parent": "duck", "scale": [1, 1.35, 0.85], "radius": 0.07, "color": "#f2c21b", "roughness": 0.45 },
+    { "id": "duck-head", "kind": "sphere", "label": "rubber duck", "parent": "duck", "at": [0, 0.05, 0.1], "radius": 0.045, "color": "#f2c21b", "roughness": 0.45 },
+    { "id": "duck-beak", "kind": "cylinder", "parent": "duck", "at": [0, 0.085, 0.14], "pitch": -90, "radius": 0.018, "top": 0.004, "height": 0.045, "color": "#f07a1e", "roughness": 0.5 },
+    { "id": "duck-eye-left", "kind": "sphere", "parent": "duck", "at": [-0.024, 0.08, 0.165], "radius": 0.007, "color": "#222222" },
+    { "id": "duck-eye-right", "kind": "sphere", "parent": "duck", "at": [0.024, 0.08, 0.165], "radius": 0.007, "color": "#222222" }
+  ],
+  "cameras": [
+    { "id": "desk-view", "type": "perspective", "at": [0.3, -2.3, 1.45], "look": [0, 0.1, 0.95], "fov": 50 },
+    { "id": "duck-view", "type": "perspective", "at": [1.4, -0.4, 1.1], "look": [0.72, 0.22, 0.9], "fov": 35 }
+  ]
+}

@@ -348,3 +348,88 @@ test('a level can carry a gable roof', async () => {
   assert.deepEqual(result.scene!.levels[0].roof, { kind: 'gable', pitch: 35, overhang: 0.4 })
   assert.ok(/"roof": \{\s*"kind": "gable"/.test(format(raw)), 'the roof is written with its keys in order')
 })
+
+// Free objects: placement math, the checks on them, and what holds a
+// person up when there are no rooms.
+import { placeObjects } from '../src/core/objects.ts'
+import { ground as standOn, obstacles as blockers, resolve as resolveWalk2 } from '../src/core/walk.ts'
+
+const objectScene = (objects: unknown[], extra: Record<string, unknown> = {}) => ({ stage: '0.1', name: 'Objects', objects, ...extra })
+
+test('a scene needs neither levels nor rooms', () => {
+  const result = check(objectScene([{ id: 'crate', kind: 'box', size: [1, 1, 1] }]))
+  assert.ok(result.ok, result.problems.map((p) => p.message).join('\n'))
+  assert.equal(result.scene!.levels[0].id, 'ground')
+  assert.equal(result.scene!.levels[0].height, 2.7)
+  assert.deepEqual(query(result.scene!, ['bounds']), { min: [-0.5, -0.5], max: [0.5, 0.5], width: 1, depth: 1 })
+})
+
+test('facing turns an object clockwise from north, in the world and in a parent', () => {
+  const scene = check(
+    objectScene([
+      { id: 'long', kind: 'box', size: [1, 2, 3], facing: 90 },
+      { id: 'cart', kind: 'group', at: [5, 5, 0], facing: 90 },
+      { id: 'lamp', kind: 'box', parent: 'cart', size: [0.2, 0.2, 1], at: [0, 1, 0.5] },
+      { id: 'pole', kind: 'box', size: [0.2, 0.2, 1], pitch: -90 },
+    ]),
+  ).scene!
+  const placed = Object.fromEntries(placeObjects(scene).map((p) => [p.object.id, p]))
+  const near = (a: number[], b: number[]) => a.forEach((n, i) => assert.ok(Math.abs(n - b[i]) < 1e-6, `${a} vs ${b}`))
+  // Its 2 m depth now runs east, its 1 m width north.
+  near(placed.long.box.min, [-1, -0.5, 0])
+  near(placed.long.box.max, [1, 0.5, 3])
+  // One meter in front of a cart facing east is one meter east of it, and
+  // the lamp's own half meter up comes along.
+  near(placed.lamp.position, [6, 5, 0.5])
+  assert.equal(placed.lamp.yaw, 90)
+  // Pitched down by a right angle, a pole lies along the ground toward north.
+  near(placed.pole.box.max, [0.1, 1, 0.1])
+  assert.equal(placed.pole.flat, false)
+})
+
+test('check names a missing parent, a parent loop, and two objects in one place', () => {
+  const result = check(
+    objectScene([
+      { id: 'a', kind: 'box', size: [1, 1, 1], parent: 'b' },
+      { id: 'b', kind: 'box', size: [1, 1, 1], parent: 'a' },
+      { id: 'c', kind: 'box', size: [1, 1, 1], parent: 'nobody' },
+      { id: 'd', kind: 'sphere', radius: 0.5, at: [10, 10, 0] },
+      { id: 'e', kind: 'cylinder', radius: 0.5, height: 1, at: [10.2, 10, 0] },
+      { id: 'f', kind: 'plane', size: [4, 4], at: [10, 10, 0] },
+    ]),
+  )
+  const messages = result.problems.map((p) => `${p.severity} ${p.entity}: ${p.message}`)
+  assert.ok(messages.some((m) => m.startsWith('error a:') && m.includes('ancestor')), messages.join('\n'))
+  assert.ok(messages.some((m) => m.startsWith('error c:') && m.includes('nobody')), messages.join('\n'))
+  assert.ok(messages.some((m) => m.startsWith('warning e:') && m.includes('runs into "d"')), messages.join('\n'))
+  // The plane under them is not in the way.
+  assert.ok(!messages.some((m) => m.includes('"f"')), messages.join('\n'))
+})
+
+test('parts of one assembly may touch; strangers may not', () => {
+  const ok = check(
+    objectScene([
+      { id: 'duck', kind: 'group' },
+      { id: 'body', kind: 'sphere', parent: 'duck', radius: 0.1 },
+      { id: 'head', kind: 'sphere', parent: 'duck', radius: 0.05, at: [0, 0.05, 0.15] },
+    ]),
+  )
+  assert.equal(ok.problems.length, 0, ok.problems.map((p) => p.message).join('\n'))
+})
+
+test('with no rooms the ground holds a person, and a low top is a step up', () => {
+  const scene = check(objectScene([{ id: 'step', kind: 'box', size: [2, 2, 0.3], at: [5, 5, 0] }, { id: 'wall', kind: 'box', size: [0.2, 4, 2], at: [8, 5, 0] }])).scene!
+  const blocking = blockers(scene)
+  assert.equal(standOn([0, 0], blocking, 0), 0)
+  assert.equal(standOn([5, 5], blocking, 0.1), 0.3)
+  // Walking into the wall from the west stops at its face.
+  const pushed = resolveWalk2([7.95, 5], blocking, undefined, 0)
+  assert.ok(pushed[0] < 7.9, `stopped at ${pushed}`)
+})
+
+test('query objects gives the world placement of a part', () => {
+  const scene = check(objectScene([{ id: 'cart', kind: 'group', at: [2, 0, 0], facing: 180 }, { id: 'crate', kind: 'box', parent: 'cart', size: [1, 1, 1], at: [0, 1, 0] }])).scene!
+  const crate = (query(scene, ['object', 'crate']) as { world: { position: number[]; size: number[] } }).world
+  assert.deepEqual(crate.position.map((n) => Math.round(n * 100) / 100), [2, -1, 0])
+  assert.deepEqual(crate.size, [1, 1, 1])
+})

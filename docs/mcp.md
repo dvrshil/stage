@@ -60,8 +60,9 @@ path if it is somewhere unusual.
 
 **Instructions.** The agent guide (`src/skill.md`) is sent as the server's
 instructions at startup, so a client that shows them to the model knows
-the scene format, how several floors work, and the order of work (rooms,
-then openings, then furniture, rendering and looking after each step)
+the scene format, free objects and assemblies, how several floors work,
+and the order of work (rooms, then openings, then furniture, or a group
+and its parts, rendering and looking after each step)
 before its first call. Clients that ignore instructions still get the
 guide from the `stage://guide` resource, and `stage skill install` puts it
 where Claude Code and Codex read skills.
@@ -77,7 +78,7 @@ an example entity for every collection, `query` lists its questions, and
 | `show` | Point their view at a camera, a level, or an entity |
 | `check` | Schema, references, and spatial rules, each with its fix |
 | `render` | An image of any camera, `room:<id>`, `plan:<level>`, or a contact sheet |
-| `query` | Rooms, a room's edges and neighbors, what fits where, free space, areas |
+| `query` | Rooms, a room's edges and neighbors, objects and where they ended up, what fits where, free space, areas |
 | `set`, `remove`, `write_scene` | Change the file; every write is checked and reported |
 | `read_scene` | The whole file, when query is not enough |
 | `assets`, `fetch_assets`, `materials` | The library, downloading what a scene needs, the surfaces |
@@ -85,8 +86,8 @@ an example entity for every collection, `query` lists its questions, and
 | `export` | The built scene as binary glTF |
 
 **Resources.** `stage://guide` (the guide), `stage://schema` (the format),
-and `stage://examples/<name>` for `flat`, `flat-with-bedroom`, and
-`two-storey`.
+and `stage://examples/<name>` for `flat`, `flat-with-bedroom`, `two-storey`,
+and `desk` (no rooms: free objects with parents).
 
 **Prompts.** `from-floor-plan` (a plan image and a path in, a walkable home
 out) and `furnish` (one room, laid out with pieces that fit).

@@ -135,14 +135,65 @@ export const CustomMaterial = z.object({
   shade: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 })
 
+// A free object: a primitive, a polygon pulled up, a glTF model, a library
+// piece, or an empty group to hang others on. Anywhere in the world, with
+// nothing to do with rooms unless `room` puts its origin on that room's
+// floor. `at` is where its bottom center stands; `facing` turns it
+// clockwise from north, `pitch` lifts its front, `roll` drops its right
+// side. With a `parent`, all of that is in the parent's own frame, so a
+// thing built from parts moves as one.
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a color like #a0b0c0')
+const objectBase = {
+  id,
+  name: z.string().optional(),
+  // Text floating above the object, for a scene that explains something.
+  label: z.string().optional(),
+  parent: id.optional(),
+  room: id.optional(),
+  at: point3.default([0, 0, 0]),
+  facing: z.number().default(0),
+  pitch: z.number().default(0),
+  roll: z.number().default(0),
+  scale: z.union([z.number().positive(), point3]).default(1),
+  // A built-in or scene material by name, or a plain color.
+  material: z.string().optional(),
+  color: hex.optional(),
+  roughness: z.number().min(0).max(1).optional(),
+  metalness: z.number().min(0).max(1).optional(),
+  opacity: z.number().min(0).max(1).optional(),
+  // Emits this color: a screen, a lamp, a hot thing.
+  glow: hex.optional(),
+  // Stops a person walking and counts in the overlap check. A plane never
+  // blocks; its top is something to stand on, like every flat top.
+  solid: z.boolean().default(true),
+}
+export const SceneObject = z.discriminatedUnion('kind', [
+  z.object({ ...objectBase, kind: z.literal('box'), size: point3.describe('[width, depth, height] in meters') }),
+  z.object({ ...objectBase, kind: z.literal('sphere'), radius: z.number().positive() }),
+  // A cone when `top` is 0, a frustum between.
+  z.object({ ...objectBase, kind: z.literal('cylinder'), radius: z.number().positive(), height: z.number().positive(), top: z.number().min(0).optional() }),
+  z.object({ ...objectBase, kind: z.literal('plane'), size: point.describe('[width, depth] in meters; lies flat, face up') }),
+  // A polygon in the object's own plan coordinates, pulled up `height`.
+  z.object({ ...objectBase, kind: z.literal('extrude'), polygon: z.array(point).min(3), height: z.number().positive() }),
+  // A glTF or glb file beside the scene, or an https URL. With a `size`
+  // the model is fitted into it; without, it keeps its own scale.
+  z.object({ ...objectBase, kind: z.literal('model'), file: z.string(), size: point3.optional() }),
+  // A piece from the library, outside the room system.
+  z.object({ ...objectBase, kind: z.literal('asset'), asset: z.string(), size: point3.optional() }),
+  z.object({ ...objectBase, kind: z.literal('group') }),
+])
+
 export const Scene = z.object({
   stage: z.literal(FORMAT_VERSION),
   name: z.string().min(1),
   units: z.literal('m').default('m'),
-  levels: z.array(Level).min(1),
-  rooms: z.array(Room).min(1),
+  // A scene needs no rooms at all: free objects stand on the ground at
+  // z = 0. A room's floor sits on its level.
+  levels: z.array(Level).prefault([{ id: 'ground' }]),
+  rooms: z.array(Room).default([]),
   openings: z.array(Opening).default([]),
   items: z.array(Item).default([]),
+  objects: z.array(SceneObject).default([]),
   lights: z.array(Light).default([]),
   cameras: z.array(Camera).default([]),
   materials: z.array(CustomMaterial).default([]),
@@ -157,22 +208,25 @@ export type Item = z.infer<typeof Item>
 export type Light = z.infer<typeof Light>
 export type Camera = z.infer<typeof Camera>
 export type CustomMaterial = z.infer<typeof CustomMaterial>
+export type SceneObject = z.infer<typeof SceneObject>
+export type ObjectKind = SceneObject['kind']
 
 // The order keys are written in, so a formatted file reads top-down the
 // way the schema does and a diff shows only real changes.
 export const KEY_ORDER: Record<string, string[]> = {
-  scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'lights', 'cameras', 'materials'],
+  scene: ['stage', 'name', 'units', 'levels', 'rooms', 'openings', 'items', 'objects', 'lights', 'cameras', 'materials'],
   level: ['id', 'name', 'elevation', 'height', 'slab', 'plan', 'roof'],
   plan: ['image', 'scale', 'origin', 'opacity'],
   room: ['id', 'level', 'name', 'floor', 'height', 'open', 'parapet', 'well', 'ceiling', 'thickness', 'materials'],
   opening: ['id', 'wall', 'at', 'type', 'width', 'height', 'sill', 'swing'],
   item: ['id', 'asset', 'room', 'at', 'facing', 'elevation', 'size', 'scale'],
+  object: ['id', 'kind', 'name', 'label', 'parent', 'room', 'at', 'facing', 'pitch', 'roll', 'scale', 'size', 'radius', 'top', 'height', 'polygon', 'file', 'asset', 'material', 'color', 'roughness', 'metalness', 'opacity', 'glow', 'solid'],
   light: ['id', 'type', 'azimuth', 'elevation', 'intensity', 'color', 'at'],
   camera: ['id', 'type', 'at', 'look', 'fov', 'level'],
   material: ['id', 'color', 'roughness', 'metalness', 'texture', 'size', 'tint', 'shade'],
 }
 
-export const COLLECTIONS = ['levels', 'rooms', 'openings', 'items', 'lights', 'cameras', 'materials'] as const
+export const COLLECTIONS = ['levels', 'rooms', 'openings', 'items', 'objects', 'lights', 'cameras', 'materials'] as const
 export type Collection = (typeof COLLECTIONS)[number]
 
 export function jsonSchema(): unknown {

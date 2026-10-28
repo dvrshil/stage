@@ -159,6 +159,29 @@ export function loadModel(id: string): Promise<THREE.Object3D | undefined> {
   return task
 }
 
+// A model from anywhere: a file beside the scene, or a URL. Loaded once
+// per address, with the same shadow setup as the library's.
+const external = new Map<string, Promise<THREE.Object3D | undefined>>()
+export function loadModelFrom(url: string): Promise<THREE.Object3D | undefined> {
+  let task = external.get(url)
+  if (!task) {
+    task = gltfLoader
+      .loadAsync(url)
+      .then((gltf) => {
+        gltf.scene.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return
+          object.castShadow = true
+          object.receiveShadow = true
+        })
+        return gltf.scene as THREE.Object3D
+      })
+      .catch(() => undefined)
+    external.set(url, task)
+    track(task)
+  }
+  return task
+}
+
 // A clone of the model turned by `yaw` degrees, scaled to fit `size`
 // ([width, depth, height] in meters), centered, and standing on y = 0.
 export function fitModel(model: THREE.Object3D, size: [number, number, number], yaw: number): THREE.Group {

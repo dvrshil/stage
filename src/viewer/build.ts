@@ -2,11 +2,12 @@ import * as THREE from 'three'
 import { alongWall, area, bounds, centroid, distanceToSegment, levelsByElevation, pointInPolygon, roomElevation, roomHeight, wallAngle, wallPieces, walls, type Point, type Wall } from '../core/geometry.ts'
 import { FIXTURES, findAsset } from '../core/assets.ts'
 import { DEFAULT_MATERIALS, MATERIALS, materialSpec } from '../core/materials.ts'
+import { placeObjects } from '../core/objects.ts'
 import type { Scene } from '../core/schema.ts'
 import { RAIL_OFFSET, sliderLayout } from '../core/slider.ts'
 import { floorToFloor } from '../core/walk.ts'
 import { buildItem, textSprite } from './furniture.ts'
-import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
+import { fitModel, hasModel, loadModel, loadModelFrom, textureSet } from './library.ts'
 import { boxInMeters, planks, speckle, tiles } from './textures.ts'
 
 // Plan coordinates [x, y] (y north) become three.js [x, -z] with y up, so
@@ -330,6 +331,8 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
     entities.set(item.id, group)
   }
 
+  buildObjects(scene, root, entities, levels.map((l) => l.elevation), options)
+
   let sun: THREE.DirectionalLight | undefined
   const lights = scene.lights.length > 0 ? scene.lights : [{ id: 'default-sun', type: 'sun' as const, azimuth: 220, elevation: 35, intensity: 1 }]
   for (const light of lights) {
@@ -357,6 +360,156 @@ export function buildScene(scene: Scene, options: BuildOptions = {}): Built {
   }
 
   return { root, entities, labels, roofs, indoor, overlays, fixtures, sun }
+}
+
+// Free objects: each kind as a mesh anchored at its bottom center, in a
+// group that carries the object's own turn and scale, inside its parent's
+// group when it has one, so the world placement matches core/objects.ts.
+function buildObjects(scene: Scene, root: THREE.Group, entities: Map<string, THREE.Object3D>, elevations: number[], options: BuildOptions): void {
+  const groups = new Map<string, THREE.Group>()
+  const placed = new Map(placeObjects(scene).map((p) => [p.object.id, p]))
+  for (const object of scene.objects) {
+    const group = new THREE.Group()
+    group.name = object.id
+    groups.set(object.id, group)
+    entities.set(object.id, group)
+    const world = placed.get(object.id)
+    const z = world?.position[2] ?? object.at[2]
+    group.userData.level = Math.max(0, elevations.filter((e) => e <= z + 0.02).length - 1)
+    group.userData.object = true
+
+    const room = object.room ? scene.rooms.find((r) => r.id === object.room) : undefined
+    const lift = room && !object.parent ? roomElevation(scene, room) : 0
+    group.position.copy(toWorld([object.at[0], object.at[1]], object.at[2] + lift))
+    // Facing clockwise from north, then the front up, then the right side
+    // down: Y, then X, then Z in three.js's frame, with the signs flipped
+    // where its axes run the other way.
+    group.rotation.set(THREE.MathUtils.degToRad(object.pitch), -THREE.MathUtils.degToRad(object.facing), -THREE.MathUtils.degToRad(object.roll), 'YXZ')
+    const scale = typeof object.scale === 'number' ? [object.scale, object.scale, object.scale] : object.scale
+    group.scale.set(scale[0], scale[2], scale[1])
+
+    const surface = objectMaterial(object)
+    const shaded = (mesh: THREE.Mesh) => {
+      mesh.castShadow = object.kind !== 'plane'
+      mesh.receiveShadow = true
+      group.add(mesh)
+    }
+    switch (object.kind) {
+      case 'box': {
+        const [w, d, h] = object.size
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), surface)
+        mesh.position.y = h / 2
+        shaded(mesh)
+        break
+      }
+      case 'sphere': {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(object.radius, 48, 32), surface)
+        mesh.position.y = object.radius
+        shaded(mesh)
+        break
+      }
+      case 'cylinder': {
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(object.top ?? object.radius, object.radius, object.height, 48), surface)
+        mesh.position.y = object.height / 2
+        shaded(mesh)
+        break
+      }
+      case 'plane': {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(object.size[0], object.size[1]), surface)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.position.y = 0.002
+        surface.side = THREE.DoubleSide
+        shaded(mesh)
+        break
+      }
+      case 'extrude': {
+        const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(floorShape(object.polygon), { depth: object.height, bevelEnabled: false }), surface)
+        mesh.rotation.x = -Math.PI / 2
+        shaded(mesh)
+        break
+      }
+      case 'asset': {
+        const info = findAsset(object.asset)
+        const piece = buildItem(object.asset, object.id, object.size ?? info?.size)
+        // Library fronts face south at facing 0, like items.
+        group.add(piece)
+        break
+      }
+      case 'model': {
+        const size = object.size ?? [1, 1, 1]
+        const stand = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[2], size[1]), new THREE.MeshStandardMaterial({ color: '#b9b4aa', roughness: 0.8, transparent: true, opacity: 0.4 }))
+        stand.position.y = size[2] / 2
+        group.add(stand)
+        const url = /^https?:\/\//.test(object.file) ? object.file : options.fileUrl?.(object.file)
+        if (url) {
+          loadModelFrom(url).then((model) => {
+            if (!model) return
+            group.remove(stand)
+            group.add(object.size ? fitModel(model, object.size, 0) : standModel(model))
+          })
+        }
+        break
+      }
+      case 'group':
+        break
+    }
+
+    if (object.label) {
+      const top = world ? world.box.max[2] - world.position[2] : 0
+      const sprite = textSprite(object.label, 0, 0.11)
+      sprite.position.y = Math.max(0.1, top / Math.max(1e-6, scale[2]) + 0.12)
+      sprite.scale.multiplyScalar(1 / Math.max(scale[0], scale[1], scale[2]))
+      group.add(sprite)
+    }
+  }
+  for (const object of scene.objects) {
+    const group = groups.get(object.id)!
+    const parent = object.parent ? groups.get(object.parent) : undefined
+    // A parent that is missing or looped (check says so) leaves the
+    // object standing in the world.
+    if (parent && !hasAncestor(groups, object.id)) parent.add(group)
+    else root.add(group)
+  }
+  function hasAncestor(all: Map<string, THREE.Group>, id: string): boolean {
+    const seen = new Set<string>()
+    let at: string | undefined = scene.objects.find((o) => o.id === id)?.parent
+    while (at && all.has(at)) {
+      if (seen.has(at) || at === id) return true
+      seen.add(at)
+      at = scene.objects.find((o) => o.id === at)?.parent
+    }
+    return false
+  }
+}
+
+// A named material, a plain color, or the default grey; opacity, glow and
+// the roughness overrides on top of either.
+function objectMaterial(object: Scene['objects'][number]): THREE.MeshStandardMaterial {
+  const base = object.material ? material(object.material, DEFAULT_MATERIALS.exterior).clone() : new THREE.MeshStandardMaterial({ color: object.color ?? '#b9b4aa', roughness: 0.6, metalness: 0 })
+  if (object.material && object.color) base.color.set(object.color)
+  if (object.roughness !== undefined) base.roughness = object.roughness
+  if (object.metalness !== undefined) base.metalness = object.metalness
+  if (object.opacity !== undefined && object.opacity < 1) {
+    base.transparent = true
+    base.opacity = object.opacity
+  }
+  if (object.glow) {
+    base.emissive = new THREE.Color(object.glow)
+    base.emissiveIntensity = 1.4
+  }
+  return base
+}
+
+// A model at its own scale, centered on the anchor and standing on it.
+function standModel(model: THREE.Object3D): THREE.Group {
+  const holder = new THREE.Group()
+  const instance = model.clone(true)
+  holder.add(instance)
+  holder.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(holder)
+  const center = box.getCenter(new THREE.Vector3())
+  instance.position.set(-center.x, -box.min.y, -center.z)
+  return holder
 }
 
 // Where a room's ceiling lights go: its center, or a grid about 4.5 m

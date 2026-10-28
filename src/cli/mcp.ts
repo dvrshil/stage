@@ -65,11 +65,12 @@ async function withRenderer<T>(work: (r: Renderer) => Promise<T>): Promise<T> {
   }
 }
 
-const EXAMPLE_NAMES = ['flat', 'flat-with-bedroom', 'two-storey'] as const
+const EXAMPLE_NAMES = ['flat', 'flat-with-bedroom', 'two-storey', 'desk'] as const
 const EXAMPLE_BLURB: Record<(typeof EXAMPLE_NAMES)[number], string> = {
   flat: 'a furnished two-room flat with two eye-level cameras',
   'flat-with-bedroom': 'the flat with a bedroom and a person standing in each room',
   'two-storey': 'a house: hall, kitchen and living below, bedrooms above, a stair through a well, and a roof terrace',
+  desk: 'no rooms at all: a desk with a monitor, keyboard and lamp, and a rubber duck built from spheres and a cone, all free objects with parents',
 }
 
 // What an entity of each collection looks like, so `set` can be called
@@ -79,6 +80,7 @@ const EXAMPLE_ENTITY: Record<Collection, string> = {
   rooms: '{"id":"kitchen","level":"ground","name":"Kitchen","floor":[[0,0],[4,0],[4,3],[0,3]],"materials":{"floor":"oak-plank"}}',
   openings: '{"id":"kitchen-door","wall":{"room":"kitchen","edge":0},"at":1.5,"type":"door","width":0.9,"height":2.1} (window: "sill":0.9; slider: a sliding glass wall)',
   items: '{"id":"table","asset":"table/dining-six","room":"kitchen","at":[2,1.5],"facing":0}',
+  objects: '{"id":"crate","kind":"box","size":[0.6,0.4,0.5],"at":[1,2,0],"facing":30,"color":"#8a6a3c"}. Kinds: box (size), sphere (radius), cylinder (radius, height; top 0 for a cone), plane (size [w, d], flat), extrude (polygon, height), model (file: a glb beside the scene or an https URL; size to fit), asset (a library piece outside the rooms), group (nothing, to hang parts on). "parent" places it in another object\'s frame so an assembly moves as one; "pitch" and "roll" tilt it; "label" floats text above it; "room" stands it on that room\'s floor. No rooms are needed at all.',
   lights: '{"id":"sun","type":"sun","azimuth":220,"elevation":35,"intensity":1}',
   cameras: '{"id":"from-door","type":"perspective","at":[0.5,0.5,1.6],"look":[2,2,1.2],"fov":55}',
   materials: '{"id":"lime-plaster","color":"#e9e2d3","roughness":0.9} or {"id":"slate","color":"#55585c","texture":"<Poly Haven id>","size":1.5}',

@@ -34,14 +34,32 @@ export async function shareScene(scenePath: string, scene: Scene, outDir: string
     files++
   }
 
-  // The library, cut down to this scene: the models its items use, the
-  // fixtures, every texture a material can name, and the sky.
-  const lock = await availableLock()
   const models = new Set<string>(Object.values(FIXTURES))
+  // Models the scene's own objects name, from beside it.
+  for (const object of scene.objects) {
+    if (object.kind !== 'model' || /^https?:\/\//.test(object.file)) continue
+    const source = resolve(dirname(scenePath), object.file)
+    if (!existsSync(source)) {
+      log(`skipping missing model ${object.file}`)
+      continue
+    }
+    const target = join(dir, 'files', object.file)
+    await mkdir(dirname(target), { recursive: true })
+    await cp(source, target)
+    files++
+  }
   for (const item of scene.items) {
     const model = ASSETS.find((a) => a.id === item.asset)?.model
     if (model) models.add(model)
   }
+  for (const object of scene.objects) {
+    const model = object.kind === 'asset' ? ASSETS.find((a) => a.id === object.asset)?.model : undefined
+    if (model) models.add(model)
+  }
+
+  // The library, cut down to this scene: the models its items use, the
+  // fixtures, every texture a material can name, and the sky.
+  const lock = await availableLock()
   const textures = new Set<string>([...Object.values(MATERIALS).map((m) => m.texture).filter((t): t is string => !!t), ...scene.materials.map((m) => m.texture).filter((t): t is string => !!t)])
   const shared = {
     version: 1,

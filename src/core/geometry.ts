@@ -1,3 +1,4 @@
+import { objectCorners } from './objects.ts'
 import type { Level, Opening, Room, Scene } from './schema.ts'
 
 // Pure plan geometry: no renderer here. The viewer turns these results into
@@ -99,8 +100,11 @@ export function bounds(points: Point[]): Bounds {
   return { min, max }
 }
 
+// Everything on the plan: room floors and the footprints of free objects.
+// An empty scene is a small square around the origin.
 export function sceneBounds(scene: Scene): Bounds {
-  return bounds(scene.rooms.flatMap((room) => room.floor))
+  const points = [...scene.rooms.flatMap((room) => room.floor), ...objectCorners(scene)]
+  return points.length ? bounds(points) : { min: [-2, -2], max: [2, 2] }
 }
 
 // Ray casting, with points on an edge counted as inside, so an item pushed

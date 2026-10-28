@@ -202,9 +202,10 @@ export async function writeLock(lock: Lock): Promise<void> {
 
 // What a scene needs from Poly Haven: the models of its items and the
 // texture sets of its own materials.
-export function sceneAssetIds(scene: { items: { asset: string }[]; materials?: { texture?: string }[] }): string[] {
+export function sceneAssetIds(scene: { items: { asset: string }[]; objects?: { kind: string; asset?: string }[]; materials?: { texture?: string }[] }): string[] {
   const ids = new Set<string>()
   for (const item of scene.items) if (ASSETS.find((a) => a.id === item.asset)?.model) ids.add(item.asset)
+  for (const object of scene.objects ?? []) if (object.kind === 'asset' && object.asset && ASSETS.find((a) => a.id === object.asset)?.model) ids.add(object.asset)
   for (const material of scene.materials ?? []) if (material.texture) ids.add(material.texture)
   return [...ids]
 }

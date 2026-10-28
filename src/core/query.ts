@@ -1,3 +1,4 @@
+import { placeObjects, round3, type Placed } from './objects.ts'
 import { findAsset } from './assets.ts'
 import { allCameras } from './cameras.ts'
 import { area, bounds, centroid, edges, levelsByElevation, pointInPolygon, roomHeight, sceneBounds, walls, type Point } from './geometry.ts'
@@ -13,6 +14,8 @@ export const QUESTIONS = [
   'walls <room>',
   'openings [in <room>]',
   'cameras',
+  'objects',
+  'object <id>',
   'bounds',
   'adjacent <room>',
   'areas [level]',
@@ -58,6 +61,14 @@ export function query(scene: Scene, words: string[]): unknown {
         .filter((o) => !inRoom || o.wall.room === inRoom || isShared(scene, o, inRoom))
         .map((o) => ({ id: o.id, type: o.type, room: o.wall.room, edge: o.wall.edge, at: o.at, width: o.width, height: o.height }))
     }
+    case 'objects':
+      return placeObjects(scene).map((p) => summarizeObject(p))
+    case 'object': {
+      const placed = placeObjects(scene).find((p) => p.object.id === rest[0])
+      if (!placed) throw new Error(`no object is called "${rest[0]}"; objects are ${scene.objects.map((o) => o.id).join(', ') || 'none'}.`)
+      const children = scene.objects.filter((o) => o.parent === placed.object.id).map((o) => o.id)
+      return { ...summarizeObject(placed), children, flat: placed.flat, box: { min: round3(placed.box.min), max: round3(placed.box.max) } }
+    }
     case 'cameras':
       return allCameras(scene).map((c) => ({ id: c.id, type: c.type, at: c.at ?? null, look: c.look ?? null, auto: c.id.startsWith('room:') }))
     case 'bounds': {
@@ -91,6 +102,14 @@ export function query(scene: Scene, words: string[]): unknown {
     default:
       throw new Error(`"${words.join(' ')}" is not a question; ask one of: ${QUESTIONS.join(', ')}.`)
   }
+}
+
+// An object as it stands in the world: its own fields, then where it
+// ended up after its parents' turns and scales.
+function summarizeObject(p: Placed) {
+  const o = p.object
+  const size = round3([p.box.max[0] - p.box.min[0], p.box.max[1] - p.box.min[1], p.box.max[2] - p.box.min[2]])
+  return { id: o.id, kind: o.kind, name: o.name ?? null, parent: o.parent ?? null, room: o.room ?? null, at: o.at, facing: o.facing, world: { position: round3(p.position), yaw: Math.round(p.yaw * 10) / 10, size } }
 }
 
 function roomOrThrow(scene: Scene, id: string | undefined): Room {

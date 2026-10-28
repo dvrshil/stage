@@ -4,6 +4,7 @@ import { MATERIALS } from './materials.ts'
 import { sliderLayout } from './slider.ts'
 import { stair } from './stairs.ts'
 import { floorToFloor } from './walk.ts'
+import { parentLoops, placeObjects } from './objects.ts'
 import { COLLECTIONS, Scene } from './schema.ts'
 
 // What `stage check` reports. Every problem names an entity and a path,
@@ -161,6 +162,38 @@ function references(scene: Scene): Problem[] {
     }
   })
 
+  const objectIds = new Set(scene.objects.map((o) => o.id))
+  const loops = new Set(parentLoops(scene))
+  scene.objects.forEach((object, index) => {
+    if (object.parent && !objectIds.has(object.parent)) {
+      problems.push({
+        severity: 'error',
+        path: `objects.${index}.parent`,
+        entity: object.id,
+        message: `parent "${object.parent}" is not an object; objects are ${[...objectIds].join(', ') || 'none'}.`,
+      })
+    }
+    if (object.parent === object.id || loops.has(object.id)) {
+      problems.push({ severity: 'error', path: `objects.${index}.parent`, entity: object.id, message: `"${object.id}" is its own ancestor through "parent"; break the loop.` })
+    }
+    if (object.room && !rooms.has(object.room)) {
+      problems.push({ severity: 'error', path: `objects.${index}.room`, entity: object.id, message: `room "${object.room}" does not exist; rooms are ${[...rooms.keys()].join(', ') || 'none'}; leave "room" out to stand on the ground.` })
+    }
+    if (object.material && !MATERIALS[object.material] && !scene.materials.some((m) => m.id === object.material)) {
+      problems.push({
+        severity: 'warning',
+        path: `objects.${index}.material`,
+        entity: object.id,
+        message: `material "${object.material}" is neither built in nor in "materials", so it renders grey; built-in materials are ${Object.keys(MATERIALS).join(', ')}, or give a "color".`,
+      })
+    }
+    if (object.kind === 'asset' && !findAsset(object.asset) && !object.size) {
+      problems.push({ severity: 'warning', path: `objects.${index}.asset`, entity: object.id, message: `"${object.asset}" is not in the library, so it renders as a labeled box; search with the assets tool, or give it a "size".` })
+    }
+    if (object.kind === 'model' && !/^https?:\/\//.test(object.file) && (object.file.startsWith('/') || object.file.includes('..'))) {
+      problems.push({ severity: 'error', path: `objects.${index}.file`, entity: object.id, message: `"file" must be a path beside the scene file, like "models/duck.glb", or an https URL.` })
+    }
+  })
   return problems
 }
 
@@ -326,7 +359,7 @@ function spatial(scene: Scene): Problem[] {
   // Two solid pieces in the same place: a sofa through a table, a bed into
   // a wardrobe. Rugs, wall pieces, and things on different levels never
   // collide.
-  const solids = scene.items
+  const pieces = scene.items
     .map((item, index) => ({ item, index, info: findAsset(item.asset), room: rooms.get(item.room) }))
     .filter((s) => s.room && !s.info?.passable && !PASSABLE.has(s.item.asset) && !['stairs', 'railing', 'person'].includes(s.info?.category ?? ''))
     .map((s) => {
@@ -335,22 +368,43 @@ function spatial(scene: Scene): Problem[] {
       return size ? { ...s, box: footprint(s.item, size), bottom: base, top: base + size[2] * s.item.scale } : undefined
     })
     .filter((s): s is NonNullable<typeof s> => !!s)
+  type Solid = { id: string; path: string; where: string; category?: string; box: Rect; bottom: number; top: number }
+  const solids: Solid[] = pieces.map((s) => ({ id: s.item.id, path: `items.${s.index}.at`, where: s.item.room, category: s.info?.category, box: s.box, bottom: s.bottom, top: s.top }))
+  // Free solid objects too, except planes and groups, and except parts of
+  // one assembly, which touch by design.
+  const placed = placeObjects(scene)
+  const ancestors = (id: string): Set<string> => {
+    const out = new Set<string>()
+    let at = scene.objects.find((o) => o.id === id)?.parent
+    while (at && !out.has(at)) {
+      out.add(at)
+      at = scene.objects.find((o) => o.id === at)?.parent
+    }
+    return out
+  }
+  const family = new Map(placed.map((p) => [p.object.id, ancestors(p.object.id)]))
+  for (const p of placed) {
+    if (!p.object.solid || p.object.kind === 'plane' || p.object.kind === 'group') continue
+    solids.push({ id: p.object.id, path: `objects.${p.index}.at`, where: p.object.parent ? `in ${p.object.parent}` : (p.object.room ?? 'the world'), box: p.footprint, bottom: p.box.min[2], top: p.box.max[2] })
+  }
+  const related = (a: string, b: string) => family.get(a)?.has(b) || family.get(b)?.has(a) || [...(family.get(a) ?? [])].some((x) => family.get(b)?.has(x))
   for (let i = 0; i < solids.length; i++) {
     for (let j = i + 1; j < solids.length; j++) {
       const p = solids[i]
       const q = solids[j]
       if (p.bottom >= q.top - 0.02 || q.bottom >= p.top - 0.02) continue
+      if (related(p.id, q.id)) continue
       // A chair slides under its table, and kitchen units join at corners.
-      const pair = [p.info?.category, q.info?.category]
-      if ((pair.includes('chair') && pair.includes('table')) || (pair[0] === pair[1] && ['kitchen', 'wall'].includes(pair[0] ?? ''))) continue
+      const pair = [p.category, q.category]
+      if ((pair.includes('chair') && pair.includes('table')) || (pair[0] && pair[0] === pair[1] && ['kitchen', 'wall'].includes(pair[0]))) continue
       // A couple of centimeters of touching is placement, not a collision.
       const shrink = (r: Rect) => ({ ...r, halfW: Math.max(0.01, r.halfW - 0.03), halfD: Math.max(0.01, r.halfD - 0.03) })
       if (!rectanglesOverlap(shrink(p.box), shrink(q.box))) continue
       problems.push({
         severity: 'warning',
-        path: `items.${q.index}.at`,
-        entity: q.item.id,
-        message: `"${q.item.id}" runs into "${p.item.id}" (${p.item.room}); move one of them apart.`,
+        path: q.path,
+        entity: q.id,
+        message: `"${q.id}" runs into "${p.id}" (${p.where}); move one of them apart.`,
       })
     }
   }
@@ -358,7 +412,7 @@ function spatial(scene: Scene): Problem[] {
   // Doors and drawers need room to open: 60 cm clear in front of a
   // wardrobe, cabinet, fridge, or kitchen unit, inside the room.
   const OPENS = new Set(['wardrobe', 'shelf', 'cabinet', 'kitchen', 'appliance', 'wash'])
-  for (const s of solids) {
+  for (const s of pieces) {
     if (!s.info || !OPENS.has(s.info.category) || s.info.category === 'kitchen' && s.item.asset === 'kitchen/island-two-meter') continue
     const reach = 0.6
     const a = (s.item.facing * Math.PI) / 180
@@ -375,7 +429,7 @@ function spatial(scene: Scene): Problem[] {
       })
       continue
     }
-    const blocker = solids.find((o) => o !== s && o.room === s.room && !(o.info?.category === 'kitchen' && s.info?.category === 'kitchen') && o.bottom < s.top && o.top > s.bottom + 0.3 && rectanglesOverlap(zone, o.box))
+    const blocker = pieces.find((o) => o !== s && o.room === s.room && !(o.info?.category === 'kitchen' && s.info?.category === 'kitchen') && o.bottom < s.top && o.top > s.bottom + 0.3 && rectanglesOverlap(zone, o.box))
     if (blocker) {
       problems.push({
         severity: 'warning',

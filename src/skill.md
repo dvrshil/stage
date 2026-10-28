@@ -1,10 +1,12 @@
 ---
 name: stage
 description: |
-  Build and change 3D scenes with Stage: houses, flats, rooms, and furniture
-  from a floor plan or a description, that a person walks through in their
-  browser. Use for any request to visualize a home, a floor plan, an interior,
-  a room layout, or furniture placement in 3D.
+  Build and change 3D scenes with Stage: any objects (primitives, glTF
+  models, library pieces, assemblies with parents) and any buildings (rooms,
+  doors, stairs, furniture from a floor plan), that a person walks through in
+  their browser. Use for any request to make, show, or explain something in
+  3D: a home or a floor plan, a product, a device, a creature, a diagram in
+  space, a set.
 ---
 
 # Stage
@@ -15,13 +17,21 @@ A Stage scene is one JSON file. You write it with `set`, `remove`, or
 never need to reread the file. A person may have the scene open in their
 browser: it updates the moment you write, and outlines what you changed.
 
+Two layers, used together or alone. `objects` are free things anywhere:
+primitives, models, library pieces, and groups of them, for a product, a
+creature, a machine, an explanation. `rooms` and what hangs on them are
+buildings: walls come from room edges, doors sit on edges, furniture
+stands in rooms, levels stack. A scene with no rooms is fine.
+
 ## Start
 
 - A new scene: `new_scene` (from an example when the person wants something
   to react to), then `open_viewer` right away so they watch it take shape.
   With no path given, use `~/stage-scenes/<name>/scene.json`.
-- An existing scene: `check` it, then `query "rooms"` for the lay of the
-  land. `read_scene` only when you must; `query` is cheaper.
+- An existing scene: `check` it, then `query "rooms"` and `query "objects"`
+  for the lay of the land. `read_scene` only when you must; `query` is
+  cheaper.
+- Not a building? Skip rooms entirely and build with `objects` (below).
 - Before the first `render` of a scene with library pieces, `fetch_assets`
   with the scene once, so the picture shows the real models and surfaces.
 - The tools: `new_scene`, `open_viewer`, `show` (fly the person's view),
@@ -49,6 +59,37 @@ browser: it updates the moment you write, and outlines what you changed.
   `at` [x, y, z] and `look` [x, y, z]; z is absolute: a level's elevation
   plus 1.6 is eye height there.
 - Ids are lowercase with hyphens and unique across the file.
+
+## Free objects
+
+- `objects`: each has a `kind` with its own fields, and stands anywhere.
+  `at` [x, y, z] is where its bottom center is (z up); `facing` turns it
+  clockwise from north, `pitch` lifts its front, `roll` drops its right
+  side; `scale` is one number or [x, y, z].
+- Kinds: `box` (`size` [w, d, h]), `sphere` (`radius`), `cylinder`
+  (`radius`, `height`; `top` 0 makes a cone, another radius a frustum),
+  `plane` (`size` [w, d], lies flat, face up), `extrude` (`polygon` in its
+  own plan coordinates, pulled up `height`), `model` (`file`: a .glb or
+  .gltf beside the scene, or an https URL; `size` fits it, else its own
+  scale), `asset` (a library piece by id, outside the rooms), `group`
+  (nothing to see, something to hang parts on).
+- `parent`: the object stands in that object's frame, so a thing built from
+  parts moves, turns and scales as one. A duck is a group with spheres and
+  a cone as children; move the group. Up to any depth.
+- Looks: `material` by name (built-in or the scene's own), or `color`;
+  `roughness`, `metalness`, `opacity`, and `glow` (emits that color: a
+  screen, a lamp) on top.
+- `solid` (default true) stops a person and counts in the overlap check;
+  parts of one assembly may touch. Every flat top within a step is
+  something to stand on; a `plane` is only that, never in the way.
+- `label` floats text above it, for a scene that explains itself.
+- `room` stands it on that room's floor; without one, z counts from the
+  ground. With no rooms at all, the ground holds the person up.
+- `query "objects"` lists every object with its world position, yaw and
+  size after its parents' turns; `query "object <id>"` adds its box and
+  children. Build a thing, query it, render it, and compare the two.
+- Build order for a thing: a `group` at its place, the biggest part first,
+  then the rest in the group's frame. Render `orbit` and a camera close in.
 
 ## Several floors
 
@@ -91,8 +132,10 @@ browser: it updates the moment you write, and outlines what you changed.
 
 ## How to work
 
-1. Rooms first. Get their sizes and how they connect right, then `check` and
-   `render` with camera `plan`. Look at the image before going on.
+1. A building: rooms first. Get their sizes and how they connect right,
+   then `check` and `render` with camera `plan`. Look at the image before
+   going on. A thing: its group and biggest part first, then `render`
+   `orbit` and look.
 2. Doors, openings, windows. `check` names any opening that does not fit its
    wall and says what to change.
 3. Furniture. `query "room <id>"` gives each edge's direction, its neighbor,

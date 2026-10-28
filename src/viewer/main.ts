@@ -465,7 +465,13 @@ function startWalk() {
   }
   const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
   if (camera) walkTo(camera.id)
-  else beginWalk(centroid(scene.rooms[0].floor), roomElevation(scene, scene.rooms[0]))
+  else if (scene.rooms.length > 0) beginWalk(centroid(scene.rooms[0].floor), roomElevation(scene, scene.rooms[0]))
+  else {
+    // No rooms: stand south of everything, looking at the middle of it.
+    const b = sceneBounds(scene)
+    const middle: Point = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2]
+    beginWalk([middle[0], b.min[1] - 2.5], 0, toWorld(middle, 1.0))
+  }
 }
 
 function rememberWalk() {
@@ -689,6 +695,7 @@ function select(id: string | undefined) {
   const item = scene.items.find((i) => i.id === id)
   const room = scene.rooms.find((r) => r.id === id)
   const opening = scene.openings.find((o) => o.id === id)
+  const object = scene.objects.find((o) => o.id === id)
   const size = item ? (findAsset(item.asset)?.size ?? item.size) : undefined
   const detail = item
     ? `${findAsset(item.asset)?.name ?? item.asset} in ${item.room} at [${item.at.join(', ')}]${size ? `, ${size.map((n) => n.toFixed(2)).join(' × ')} m` : ''}`
@@ -696,7 +703,9 @@ function select(id: string | undefined) {
       ? `room${room.name ? `, ${room.name}` : ''}`
       : opening
         ? `${opening.type} on ${opening.wall.room} edge ${opening.wall.edge}, ${opening.width} m wide`
-        : ''
+        : object
+          ? `${object.kind}${object.name ? `, ${object.name}` : ''} at [${object.at.join(', ')}]${object.parent ? ` in ${object.parent}` : ''}`
+          : ''
   panel.innerHTML = `<code>${escape(id)}</code> ${escape(detail)}`
   panel.classList.remove('hidden')
   highlight([id], 1600)
@@ -735,7 +744,7 @@ function focus(id: string) {
 
 function entityFingerprints(s: Scene): Map<string, string> {
   const map = new Map<string, string>()
-  for (const list of [s.rooms, s.openings, s.items, s.lights, s.cameras]) {
+  for (const list of [s.rooms, s.openings, s.items, s.objects, s.lights, s.cameras]) {
     for (const entity of list) map.set(entity.id, JSON.stringify(entity))
   }
   return map

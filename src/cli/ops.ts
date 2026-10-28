@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { z } from 'zod'
 import { check, type CheckResult } from '../core/check.ts'
-import { Camera, Item, Level, Light, Opening, Room, type Collection, CustomMaterial } from '../core/schema.ts'
+import { Camera, Item, Level, Light, Opening, Room, type Collection, CustomMaterial, SceneObject } from '../core/schema.ts'
 import { readScene, writeScene } from '../core/store.ts'
 import { DEFAULT_PORT, healthy, viewerUrl } from './server.ts'
 
@@ -23,6 +23,7 @@ export const SCHEMAS: Record<Collection, z.ZodType> = {
   openings: Opening,
   materials: CustomMaterial,
   items: Item,
+  objects: SceneObject,
   lights: Light,
   cameras: Camera,
 }
@@ -33,7 +34,7 @@ export async function newScene(path: string, name: string, from = 'empty'): Prom
   mkdirSync(dirname(target), { recursive: true })
   if (from !== 'empty') {
     const example = join(EXAMPLES, from, 'scene.json')
-    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, two-storey, or empty`)
+    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, two-storey, desk, or empty`)
     await copyFile(example, target)
     return target
   }

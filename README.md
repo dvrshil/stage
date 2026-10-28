@@ -3,24 +3,29 @@
 ![A furnished flat in Stage, seen from above](docs/overview.png)
 
 An open-source 3D scene engine that AI agents drive and people walk through.
-An agent writes one JSON scene file (rooms, doors, windows, furniture,
-light) and checks, queries, and renders it from the command line or over
-MCP. A person opens the same file in a browser, watches it change as the
-agent works, and walks through it at eye level.
+An agent writes one JSON scene file and checks, queries, and renders it from
+the command line or over MCP. A person opens the same file in a browser,
+watches it change as the agent works, and walks through it at eye level.
 
-The first job it does well: turn a floor plan into a furnished home you can
-walk through, to brainstorm what a place could become. Whole houses work:
-several levels with slabs and stairs, double-height rooms, terraces and
-gardens, the architect's drawing under each plan, and a library of about
-two hundred CC0 pieces with real sizes.
+Two layers, used together or alone. **Objects** are anything: primitives,
+glTF models, library pieces, and assemblies built from parts that move as
+one, for a product, a device, a creature, a set, an explanation in space.
+**Buildings** are rooms, doors, windows, stairs, and furniture, from a floor
+plan or a description: walls come from room edges, levels stack, and whole
+houses work, with the architect's drawing under each plan. A library of
+about two hundred CC0 pieces with real sizes serves both.
+
+| No rooms at all: a desk, a computer, and a duck built from parts | A house from a floor plan |
+| --- | --- |
+| ![A desk with a monitor, a lamp, and a rubber duck made of spheres](docs/desk.jpg) | ![A double-height living room with sliding glass](docs/home-living.jpg) |
 
 | From the front door | The bedroom |
 | --- | --- |
 | ![Living room at eye level](docs/living-room.png) | ![Bedroom at eye level](docs/bedroom.png) |
 
-| A two-storey glass wall onto a shared garden | The same house from the roof |
+| The same house from the roof | A shared garden between two houses |
 | --- | --- |
-| ![A double-height living room with sliding glass](docs/home-living.jpg) | ![A roof garden between two houses](docs/home-roof.jpg) |
+| ![A roof garden between two houses](docs/home-roof.jpg) | ![The garden](docs/home-garden.jpg) |
 
 | Every camera and every room on one sheet | The plan, with sizes |
 | --- | --- |
@@ -28,7 +33,8 @@ two hundred CC0 pieces with real sizes.
 
 ## Try it in a browser
 
-The two-storey example is live at <https://dvrshil.github.io/stage/two-storey/>:
+The two-storey house is live at <https://dvrshil.github.io/stage/two-storey/>
+and the desk at <https://dvrshil.github.io/stage/desk/>:
 press **Walk inside**, then `W` `A` `S` `D` and the mouse. No install.
 
 ## Install
@@ -70,15 +76,37 @@ conversation. `node bin/stage.js skill install` also installs the guide as a
 skill for Claude Code and Codex, for agents that read skills before tools.
 
 Then ask: "Start a scene from the two-storey example, open it, and move the
-sofa under the window." The agent sees every render it asks for; you see
-every change in your browser as it lands.
+sofa under the window." Or: "Build me a rubber duck on a desk." The agent
+sees every render it asks for; you see every change in your browser as it
+lands.
 
 ## The scene file
 
-Meters and degrees; plan coordinates `[x, y]` with x east and y north.
-Rooms are floor polygons, and walls are built from their edges, shared
-where two rooms meet. Openings sit on a room's edge. Items are library
-assets placed by their center and turned by `facing` (0 faces north).
+Meters and degrees; plan coordinates `[x, y]` with x east and y north, z
+up. **Objects** stand anywhere by their bottom center, turned by `facing`
+(clockwise from north), `pitch`, and `roll`; a `parent` puts one in
+another's frame, so an assembly moves as one. Kinds: `box`, `sphere`,
+`cylinder` (a cone with `top: 0`), `plane`, `extrude` (a polygon pulled
+up), `model` (any glTF beside the scene or at a URL), `asset` (a library
+piece), and `group`. A material by name or a `color`, plus `roughness`,
+`metalness`, `opacity`, and `glow`.
+
+```json
+{
+  "stage": "0.1",
+  "name": "A duck",
+  "objects": [
+    { "id": "duck", "kind": "group", "at": [0, 0, 0.8], "facing": 215 },
+    { "id": "body", "kind": "sphere", "parent": "duck", "radius": 0.07, "scale": [1, 1.35, 0.85], "color": "#f2c21b" },
+    { "id": "head", "kind": "sphere", "parent": "duck", "radius": 0.045, "at": [0, 0.05, 0.1], "color": "#f2c21b", "label": "rubber duck" },
+    { "id": "beak", "kind": "cylinder", "parent": "duck", "radius": 0.018, "top": 0, "height": 0.045, "at": [0, 0.085, 0.14], "pitch": -90, "color": "#f07a1e" }
+  ]
+}
+```
+
+**Buildings** are rooms: floor polygons, with walls built from their edges,
+shared where two rooms meet. Openings sit on a room's edge. Items are
+library assets placed by their center in a room and turned by `facing`.
 
 ```json
 {
@@ -101,7 +129,8 @@ image, the architect's drawing, shown under the plan view so the walls can
 be checked against it; render `plan:<level>` to see one floor at a time.
 
 `node bin/stage.js schema` prints the whole format as JSON Schema, and
-`examples/` has three complete scenes, including a two-storey house.
+`examples/` has four complete scenes: a flat, a flat with a bedroom, a
+two-storey house, and the desk above, which has no rooms at all.
 
 ## Commands
 
@@ -114,7 +143,7 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 | `stage check <scene>` | Schema, references, and spatial rules |
 | `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor, `room:<id>` for a camera standing in any room |
 | `stage render <scene> --all-cameras -o sheet.png` | Every camera, and one per room, as a contact sheet |
-| `stage query <scene> rooms` | Also `room <id>`, `items in <room>`, `walls <room>`, `openings`, `cameras`, `bounds`, `adjacent <room>`, `areas [level]`, `free <room>`, `fits <asset> in <room>` |
+| `stage query <scene> rooms` | Also `room <id>`, `objects`, `object <id>` (its world placement after its parents), `items in <room>`, `walls <room>`, `openings`, `cameras`, `bounds`, `adjacent <room>`, `areas [level]`, `free <room>`, `fits <asset> in <room>` |
 | `stage set <scene> items '<json>'` | Add an entity, or replace the one with its id |
 | `stage remove <scene> <id>` | Remove an entity |
 | `stage open <scene>` | The live viewer in your browser |
