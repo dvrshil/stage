@@ -264,3 +264,22 @@ test('an item in a doorway is reported', async () => {
   raw.items.push({ id: 'blocker', asset: 'shelf/bookcase', room: room.id, at: [cx + nx * sign * 0.4, cy + ny * sign * 0.4] })
   assert.match(messages(raw).join('\n'), /warning blocker: "blocker" stands in the way of door "front-door"/)
 })
+
+test('a sliding door lets a person through its open panels, not its closed ones', async () => {
+  const raw = {
+    stage: '0.1',
+    name: 'slider',
+    units: 'm',
+    levels: [{ id: 'ground', elevation: 0, height: 2.7 }],
+    rooms: [{ id: 'room', level: 'ground', name: 'Room', floor: [[0, 0], [6, 0], [6, 4], [0, 4]] }],
+    // Three panels of 1.33 m from x 1 to 5; the middle one stands open.
+    openings: [{ id: 'glass', wall: { room: 'room', edge: 0 }, at: 1, type: 'slider', width: 4, height: 2.4 }],
+    items: [{ id: 'sofa', asset: 'sofa/three-seat', room: 'room', at: [3, 0.6], facing: 180 }],
+  }
+  const result = check(raw)
+  assert.match(result.problems.map((p) => p.message).join('\n'), /"sofa".*"glass"/s, 'a sofa in front of the open panel blocks the door')
+  const blocking = obstacles({ ...result.scene!, items: [] })
+  assert.ok(walk([3, 1], [0, -1], 100, blocking).at(-1)![1] < -0.5, 'through the open middle panel')
+  assert.ok(walk([1.6, 1], [0, -1], 100, blocking).at(-1)![1] > 0, 'stopped by the closed panel')
+  assert.ok(walk([0.5, 1], [0, -1], 100, blocking).at(-1)![1] > 0, 'stopped by the wall beside it')
+})

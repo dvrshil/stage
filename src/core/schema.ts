@@ -68,7 +68,9 @@ export const Opening = z.object({
   id,
   wall: z.object({ room: id, edge: z.number().int().min(0) }),
   at: z.number().min(0),
-  type: z.enum(['door', 'window', 'opening']),
+  // A slider is a sliding glass door from the floor up; its middle panels
+  // stand open.
+  type: z.enum(['door', 'window', 'opening', 'slider']),
   width: z.number().positive(),
   height: z.number().positive(),
   sill: z.number().min(0).optional(),

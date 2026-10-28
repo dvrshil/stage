@@ -2,6 +2,7 @@ import { findAsset } from './assets.ts'
 import { alongWall, levelsByElevation, pointInPolygon, roomElevation, wallPieces, walls, type Point } from './geometry.ts'
 import type { Scene } from './schema.ts'
 import { stair, type Stair } from './stairs.ts'
+import { RAIL_OFFSET, sliderLayout } from './slider.ts'
 
 // Walking through a scene: what stops a person, how they slide off it, and
 // what they stand on, floor by floor and up the stairs. Pure plan geometry,
@@ -28,6 +29,15 @@ export function obstacles(scene: Scene): Obstacles {
   for (const wall of walls(scene)) {
     for (const piece of wallPieces(wall)) {
       result.walls.push({ a: alongWall(wall, piece.from), b: alongWall(wall, piece.to), half: wall.thickness / 2, bottom: wall.elevation + piece.bottom, top: wall.elevation + piece.top })
+    }
+    // The closed panels of a sliding door stop a person; the gap does not.
+    for (const hole of wall.openings) {
+      if (hole.opening.type !== 'slider') continue
+      const { gap } = sliderLayout(hole.to - hole.from, hole.top - hole.bottom)
+      for (const [from, to] of [[hole.from, hole.from + gap.from], [hole.from + gap.to, hole.to]]) {
+        if (to - from < 1e-3) continue
+        result.walls.push({ a: alongWall(wall, from), b: alongWall(wall, to), half: RAIL_OFFSET + 0.02, bottom: wall.elevation + hole.bottom, top: wall.elevation + hole.top })
+      }
     }
   }
   const rooms = new Map(scene.rooms.map((room) => [room.id, room]))

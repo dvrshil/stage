@@ -3,6 +3,7 @@ import { alongWall, area, bounds, centroid, distanceToSegment, levelsByElevation
 import { FIXTURES, findAsset } from '../core/assets.ts'
 import { DEFAULT_MATERIALS, MATERIALS } from '../core/materials.ts'
 import type { Scene } from '../core/schema.ts'
+import { RAIL_OFFSET, sliderLayout } from '../core/slider.ts'
 import { floorToFloor } from '../core/walk.ts'
 import { buildItem, textSprite } from './furniture.ts'
 import { fitModel, hasModel, loadModel, textureSet } from './library.ts'
@@ -520,6 +521,47 @@ function buildOpening(wall: Wall, hole: Wall['openings'][number]): THREE.Object3
     const head = new THREE.Mesh(new THREE.BoxGeometry(width + 0.14, 0.07, depth), TRIM)
     head.position.set(0, height + 0.035, 0)
     group.add(head)
+    return group
+  }
+
+  if (opening.type === 'slider') {
+    // Glass panels on two rails, the middle ones slid open; a fixed transom
+    // above tall ones, with its mullions on the panel lines.
+    const { panels, panelTop } = sliderLayout(width, height)
+    const frame = 0.045
+    const depth = wall.thickness + 0.03
+    const bar = (w: number, h: number, d: number, x: number, y: number, z: number, material = FRAME) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
+      mesh.position.set(x, y, z)
+      mesh.castShadow = true
+      group.add(mesh)
+    }
+    // Threshold track, head, and jambs.
+    bar(width, 0.02, depth, 0, 0.01, 0, TRIM)
+    bar(width + 0.12, 0.06, depth, 0, panelTop + 0.03, 0, TRIM)
+    bar(0.06, height + 0.06, depth, -width / 2 - 0.03, (height + 0.06) / 2, 0, TRIM)
+    bar(0.06, height + 0.06, depth, width / 2 + 0.03, (height + 0.06) / 2, 0, TRIM)
+    for (const panel of panels) {
+      const w = panel.to - panel.from
+      const x = -width / 2 + panel.at + w / 2
+      const z = (panel.rail === 0 ? -1 : 1) * RAIL_OFFSET
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(w - frame, panelTop - 0.02 - frame, 0.01), GLASS)
+      glass.position.set(x, 0.02 + (panelTop - 0.02) / 2, z)
+      group.add(glass)
+      bar(w, frame, 0.04, x, 0.02 + frame / 2, z)
+      bar(w, frame, 0.04, x, panelTop - frame / 2, z)
+      bar(frame, panelTop - 0.02, 0.04, x - w / 2 + frame / 2, 0.02 + (panelTop - 0.02) / 2, z)
+      bar(frame, panelTop - 0.02, 0.04, x + w / 2 - frame / 2, 0.02 + (panelTop - 0.02) / 2, z)
+    }
+    const transom = height - panelTop - 0.06
+    if (transom > 0.1) {
+      const base = panelTop + 0.06
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(width - frame, transom - frame, 0.01), GLASS)
+      glass.position.set(0, base + transom / 2, 0)
+      group.add(glass)
+      bar(width, frame, 0.06, 0, base + transom - frame / 2, 0)
+      for (const panel of panels.slice(1)) bar(0.04, transom, 0.06, -width / 2 + panel.from, base + transom / 2, 0)
+    }
     return group
   }
 

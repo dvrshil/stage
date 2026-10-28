@@ -1,6 +1,7 @@
 import { findAsset } from './assets.ts'
 import { DEFAULT_SILL, area, edges, levelsByElevation, pointInPolygon, roomElevation, roomHeight, type Point } from './geometry.ts'
 import { MATERIALS } from './materials.ts'
+import { sliderLayout } from './slider.ts'
 import { COLLECTIONS, Scene } from './schema.ts'
 
 // What `stage check` reports. Every problem names an entity and a path,
@@ -245,7 +246,10 @@ function spatial(scene: Scene): Problem[] {
     if (!room || !edge || edge.length === 0) return
     const ux = (edge.b[0] - edge.a[0]) / edge.length
     const uy = (edge.b[1] - edge.a[1]) / edge.length
-    const center: Point = [edge.a[0] + ux * (opening.at + opening.width / 2), edge.a[1] + uy * (opening.at + opening.width / 2)]
+    // Only the open panels of a slider need to stay clear.
+    const clear = opening.type === 'slider' ? sliderLayout(opening.width, opening.height).gap : { from: 0, to: opening.width }
+    const clearWidth = clear.to - clear.from
+    const center: Point = [edge.a[0] + ux * (opening.at + (clear.from + clear.to) / 2), edge.a[1] + uy * (opening.at + (clear.from + clear.to) / 2)]
     const floor = roomElevation(scene, room)
     scene.items.forEach((item, index) => {
       const info = findAsset(item.asset)
@@ -256,7 +260,7 @@ function spatial(scene: Scene): Problem[] {
       const itemRoom = rooms.get(item.room)
       const base = (itemRoom ? roomElevation(scene, itemRoom) : 0) + item.elevation
       if (base > floor + opening.height || base + size[2] * item.scale < floor + 0.25) return
-      const zone = { x: center[0], y: center[1], halfW: opening.width / 2, halfD: CLEAR, angle: Math.atan2(uy, ux) }
+      const zone = { x: center[0], y: center[1], halfW: clearWidth / 2, halfD: CLEAR, angle: Math.atan2(uy, ux) }
       const box = { x: item.at[0], y: item.at[1], halfW: (size[0] * item.scale) / 2 + 0.05, halfD: (size[1] * item.scale) / 2 + 0.05, angle: (-item.facing * Math.PI) / 180 }
       if (!rectanglesOverlap(zone, box)) return
       problems.push({
