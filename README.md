@@ -38,19 +38,49 @@ The two-storey house is live at <https://dvrshil.github.io/stage/two-storey/>
 and the desk at <https://dvrshil.github.io/stage/desk/>:
 press **Walk inside**, then `W` `A` `S` `D` and the mouse. No install.
 
-## Install
+## Use it with an agent
 
-Stage needs Node 22.18 or later (24 or later is best), and Chromium or
-Chrome for headless renders; the viewer runs in any browser.
+Stage is an MCP server, and that is the way to use it. Clone it, install
+it, and add it to your agent from inside the folder, so the path takes
+care of itself:
 
 ```sh
 git clone https://github.com/dvrshil/stage
-cd stage && npm install           # also builds the viewer
-node bin/stage.js assets fetch    # 40 MB of CC0 textures, models, and sky, into ~/.cache/stage
+cd stage
+npm install                     # also builds the viewer
+node bin/stage.js assets fetch  # 40 MB of CC0 textures, models, and sky, into ~/.cache/stage
+
+# Claude Code
+claude mcp add --scope user stage -- node "$PWD/bin/stage.js" mcp
+
+# Codex
+codex mcp add stage -- node "$PWD/bin/stage.js" mcp
 ```
 
-Without `assets fetch`, everything still works: textures fall back to
-patterns drawn in code and furniture to pieces built from primitives.
+Cursor, Claude Desktop, Gemini CLI, VS Code, and any other MCP client take
+the same command, `node <the folder>/bin/stage.js mcp`, in their JSON
+config; [docs/mcp.md](docs/mcp.md) has each one, and the two optional keys
+for the model libraries. Opening this repository itself in Claude Code
+offers the server from its `.mcp.json`.
+
+Then start a fresh session and ask: "Build me a rubber duck on a desk and
+open it in my browser." Or: "Start a scene from the two-storey example,
+open it, and move the sofa under the window." The agent sees every render
+it asks for; you see every change in your browser as it lands.
+
+The server carries its own guide, so an agent that has never seen Stage
+knows the format and the order of work before its first call: a group and
+its parts for a thing, rooms then openings then furniture for a building,
+looking at a render after each step. The tools say what they are for,
+`query` and `check` answer in words that name the entity and the fix, and
+`render` hands the image back into the conversation. `node
+bin/stage.js skill install` also installs the guide as a skill for Claude
+Code and Codex, for agents that read skills before tools.
+
+Stage needs Node 22.18 or later (24 or later is best), and Chromium or
+Chrome for headless renders; the viewer runs in any browser. Without
+`assets fetch`, everything still works: textures fall back to patterns
+drawn in code and furniture to pieces built from primitives.
 `npm install -g .` puts a `stage` command on your path; the examples
 below spell it out as `node bin/stage.js`.
 
@@ -61,33 +91,6 @@ packs). The first three need no key; Poly Pizza wants a free key in
 `POLY_PIZZA_KEY`, and downloading from Sketchfab wants your free account
 token in `SKETCHFAB_TOKEN`. Every fetched model lands beside the scene
 with its license and author recorded, and `share` writes the credits.
-
-## Use it with an agent
-
-Stage is an MCP server. One line adds it to Claude Code:
-
-```sh
-claude mcp add --scope user stage -- node /path/to/stage/bin/stage.js mcp
-```
-
-Codex is `codex mcp add stage -- node /path/to/stage/bin/stage.js mcp`;
-Cursor, Claude Desktop, Gemini CLI, VS Code, and any other MCP client take
-the same command in their JSON config, and [docs/mcp.md](docs/mcp.md) has
-each one. Opening this repository itself in Claude Code offers the server
-from its `.mcp.json`.
-
-The server carries its own guide, so an agent that has never seen Stage
-knows the format and the order of work before its first call: rooms, then
-openings, then furniture, looking at a render after each step. The tools
-say what they are for, `query` and `check` answer in words that name the
-entity and the fix, and `render` hands the image back into the
-conversation. `node bin/stage.js skill install` also installs the guide as a
-skill for Claude Code and Codex, for agents that read skills before tools.
-
-Then ask: "Start a scene from the two-storey example, open it, and move the
-sofa under the window." Or: "Build me a rubber duck on a desk." The agent
-sees every render it asks for; you see every change in your browser as it
-lands.
 
 ## The scene file
 

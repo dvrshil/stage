@@ -4,18 +4,20 @@
 can start it; the command is the same everywhere:
 
 ```
-node /path/to/stage/bin/stage.js mcp
+node <the stage folder>/bin/stage.js mcp
 ```
 
-Replace `/path/to/stage` with where you cloned it. Once the package is on
-npm, `npx -y stage-engine mcp` does the same without a clone.
+Run the add commands below from inside the folder you cloned, and `$PWD`
+fills the path in. Once the package is on npm, `npx -y stage-engine mcp`
+does the same without a clone.
 
 ## Clients
 
 **Claude Code**
 
 ```sh
-claude mcp add --scope user stage -- node /path/to/stage/bin/stage.js mcp
+cd stage
+claude mcp add --scope user stage -- node "$PWD/bin/stage.js" mcp
 ```
 
 A project can also carry it: this repository's `.mcp.json` starts the server
@@ -24,7 +26,8 @@ from the checkout when you open it in Claude Code.
 **Codex**
 
 ```sh
-codex mcp add stage -- node /path/to/stage/bin/stage.js mcp
+cd stage
+codex mcp add stage -- node "$PWD/bin/stage.js" mcp
 ```
 
 or in `~/.codex/config.toml`:
@@ -75,7 +78,7 @@ just found. In a JSON config they go in `env`:
 }
 ```
 
-With Claude Code: `claude mcp add --scope user -e POLY_PIZZA_KEY=... -e SKETCHFAB_TOKEN=... stage -- node /path/to/stage/bin/stage.js mcp`.
+With Claude Code: `claude mcp add --scope user -e POLY_PIZZA_KEY=... -e SKETCHFAB_TOKEN=... stage -- node "$PWD/bin/stage.js" mcp`. With Codex, add an `[mcp_servers.stage.env]` table with the two keys to `~/.codex/config.toml`.
 
 ## What the server exposes
 
