@@ -553,24 +553,27 @@ function stairs([w, d, h]: [number, number, number], options: BuildItemOptions, 
     slab.receiveShadow = true
     g.add(slab)
   }
-  // Handrail along the inner edge: a post per tread, a rail between.
+  // Handrails on both edges: a post per tread, a rail between. The outer
+  // one sits a little in from the edge, clear of any wall.
   const railH = 0.95
-  let previous: THREE.Vector3 | undefined
-  for (const tread of s.treads) {
-    const [p] = tread.inner
-    const post = new THREE.Vector3(p[0], tread.top, -p[1])
-    const top = post.clone().setY(tread.top + railH)
-    cylinder(g, STEEL, 0.012, 0.012, railH, post.x, post.y, post.z)
-    if (previous) {
-      const from = previous
-      const to = top
-      const length = from.distanceTo(to)
-      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, length, 10), STEEL)
-      rail.position.copy(from).lerp(to, 0.5)
-      rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize())
-      g.add(rail)
+  for (const edge of ['inner', 'outer'] as const) {
+    let previous: THREE.Vector3 | undefined
+    for (const tread of s.treads) {
+      const [a, b] = edge === 'inner' ? tread.inner : [tread.polygon[1], tread.polygon[tread.polygon.length - 2]]
+      const p = edge === 'inner' ? a : [a[0] + (tread.inner[0][0] - a[0]) * 0.08, a[1] + (tread.inner[0][1] - a[1]) * 0.08]
+      void b
+      const post = new THREE.Vector3(p[0], tread.top, -p[1])
+      const top = post.clone().setY(tread.top + railH)
+      cylinder(g, STEEL, 0.012, 0.012, railH, post.x, post.y, post.z)
+      if (previous) {
+        const length = previous.distanceTo(top)
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, length, 10), STEEL)
+        rail.position.copy(previous).lerp(top, 0.5)
+        rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(previous).normalize())
+        g.add(rail)
+      }
+      previous = top
     }
-    previous = top
   }
   // Nosing strips make the steps read from a distance.
   for (const tread of s.treads) {
@@ -690,6 +693,12 @@ function wallCabinets([w, d]: [number, number, number]): THREE.Group {
   return g
 }
 
+function standIn([w, d, h]: [number, number, number]): THREE.Group {
+  const g = new THREE.Group()
+  box(g, mat('#d9d6d0', 0.8), w * 0.9, h * 0.9, d * 0.9).castShadow = false
+  return g
+}
+
 // A labeled box for an asset the library doesn't have, so the scene always
 // builds and the agent can finish the layout before resolving the asset.
 function placeholder(label: string, [w, d, h]: [number, number, number]): THREE.Group {
@@ -734,7 +743,9 @@ export function buildItem(asset: string, label: string, size?: [number, number, 
   const info = findAsset(asset)
   const builder = BUILDERS[asset]
   const measure = info ? (info.resizable && size ? size : info.size) : (size ?? [0.5, 0.5, 0.5])
-  const group = info && builder ? builder(measure, options) : placeholder(label, measure)
+  // A piece with a model but no primitive stands in as a plain block, not
+  // a labeled placeholder, for the moment before the model arrives.
+  const group = info && builder ? builder(measure, options) : info?.model && hasModel(info.model) ? standIn(measure) : placeholder(label, measure)
   const [w, d] = measure
   if (info?.model && hasModel(info.model)) {
     // The primitive piece stands in until the model arrives, then steps

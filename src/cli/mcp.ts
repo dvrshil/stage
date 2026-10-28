@@ -31,11 +31,34 @@ async function guarded(work: () => Promise<Content[]>): Promise<{ content: Conte
   }
 }
 
+// One headless browser, started on the first render and closed again
+// after two idle minutes, so it never sits on a gigabyte between calls.
+// A browser that died takes its promise with it.
 let renderer: Promise<Renderer> | undefined
+let idle: NodeJS.Timeout | undefined
 const getRenderer = () => (renderer ??= Renderer.start().catch((error) => {
   renderer = undefined
   throw error
 }))
+async function withRenderer<T>(work: (r: Renderer) => Promise<T>): Promise<T> {
+  clearTimeout(idle)
+  const r = await getRenderer()
+  try {
+    return await work(r)
+  } catch (error) {
+    if (/connect|closed|socket|target/i.test(String((error as Error).message))) {
+      renderer = undefined
+      await r.close().catch(() => {})
+    }
+    throw error
+  } finally {
+    idle = setTimeout(() => {
+      const closing = renderer
+      renderer = undefined
+      closing?.then((r) => r.close()).catch(() => {})
+    }, 120_000)
+  }
+}
 
 const scenePath = z.string().describe('Path to the scene file, ideally absolute, e.g. /home/me/scenes/flat/scene.json')
 
@@ -96,7 +119,7 @@ export async function runMcp(): Promise<void> {
       guarded(async () => {
         const result = await checkScene(scene)
         if (!result.ok) return [text(`${problems(result)}\nfix the errors before rendering`)]
-        const png = await (await getRenderer()).render(resolve(scene), { camera, level, width, height })
+        const png = await withRenderer((r) => r.render(resolve(scene), { camera, level, width, height }))
         return [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }, text(problems(result))]
       }),
   )

@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
@@ -94,7 +93,29 @@ let active: THREE.Camera = perspective
 const orbit = new OrbitControls(perspective, canvas)
 orbit.enableDamping = !headless
 orbit.maxPolarAngle = Math.PI * 0.495
-const look = new PointerLockControls(perspective, document.body)
+// First-person looking: a yaw and a pitch the mouse (locked, or dragged),
+// the arrow keys, or a touch turn. No pointer lock is needed; it is used
+// when the browser grants it, for the smoothest look.
+let yaw = 0
+let pitch = 0
+// The place the person is at or was last sent to, for the menu and for
+// next and previous.
+let currentPlace: string | undefined
+const locked = () => document.pointerLockElement === canvas
+function applyLook() {
+  perspective.rotation.set(pitch, yaw, 0, 'YXZ')
+}
+function lookFrom(from: THREE.Vector3, to: THREE.Vector3) {
+  const d = to.clone().sub(from)
+  yaw = Math.atan2(-d.x, -d.z)
+  pitch = Math.max(-1.4, Math.min(1.4, Math.atan2(d.y, Math.hypot(d.x, d.z))))
+  applyLook()
+}
+function turn(dx: number, dy: number) {
+  yaw -= dx * 0.0025
+  pitch = Math.max(-1.4, Math.min(1.4, pitch - dy * 0.0025))
+  applyLook()
+}
 
 // Ambient occlusion: the darkening where walls meet floors and under
 // furniture, which direct light alone never gives. Perspective views only.
@@ -242,9 +263,11 @@ function applyView(next: View, label: string) {
   if (built) built.labels.visible = labelsOn && (view === 'plan' || view === 'orbit')
   inside = undefined
   $('camera').textContent = label
+  document.body.classList.toggle('walking', view === 'walk')
   applyLevelCap()
-  for (const button of document.querySelectorAll<HTMLButtonElement>('#toolbar button')) {
-    button.classList.toggle('active', button.dataset.camera === label.replace(/^.*: /, '').replace(/ · .*$/, ''))
+  const current = view === 'walk' ? currentPlace : view === 'orbit' ? 'orbit' : view === 'plan' ? 'plan' : undefined
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#sidebar button[data-camera]')) {
+    button.classList.toggle('active', button.dataset.camera === current || (view === 'walk' && button.dataset.camera === 'walk'))
   }
 }
 
@@ -291,7 +314,8 @@ function overview() {
 
 function useCamera(id: string) {
   if (!scene) return
-  if (look.isLocked) look.unlock()
+  if (locked()) document.exitPointerLock()
+  rememberWalk()
   // "plan:first" or "orbit:first" looks at that level and the ones below.
   const [name, levelId] = id.split(':')
   const camera = scene.cameras.find((c) => c.id === name)
@@ -312,6 +336,10 @@ function useCamera(id: string) {
     if (wanted !== undefined) cap = wanted >= levels.length - 1 ? Infinity : wanted
     overview()
     applyView('orbit', 'camera: orbit')
+  } else if (!headless) {
+    // A person goes to the place and stands there, feet on the floor.
+    walkTo(camera.id)
+    return
   } else {
     perspective.fov = camera.fov
     perspective.updateProjectionMatrix()
@@ -348,31 +376,54 @@ function standOn(p: Point, near: number): number {
   return best
 }
 
-function startWalk() {
+// Where the person last stood, so leaving for the overview and coming
+// back continues the walk.
+let lastWalk: { position: THREE.Vector3; yaw: number; pitch: number; foot: number } | undefined
+
+function beginWalk(at: Point, z: number, lookAt?: THREE.Vector3, label = 'walk') {
   if (!scene) return
+  if (orbit.enabled) orbit.enabled = false
   active = perspective
-  orbit.enabled = false
   perspective.fov = WALK_FOV
   perspective.updateProjectionMatrix()
   velocity.set(0, 0)
-  let at: Point = [perspective.position.x, -perspective.position.z]
-  let z = perspective.position.y - EYE
-  // From an overview, step in at the first eye-level camera, or the middle
-  // of the first room.
-  if (view === 'orbit' || view === 'plan' || view === 'focus' || !insideAnyRoom(at)) {
-    const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
-    at = camera?.at ? [camera.at[0], camera.at[1]] : centroid(scene.rooms[0].floor)
-    z = camera?.at ? camera.at[2] - EYE : roomElevation(scene, scene.rooms[0])
-    foot = standOn(at, z)
-    perspective.position.copy(toWorld(resolve(at), foot + EYE))
-    if (camera?.look) perspective.lookAt(toWorld([camera.look[0], camera.look[1]], foot + EYE))
-  } else {
-    foot = standOn(at, z)
-    perspective.position.copy(toWorld(resolve(at), foot + EYE))
-  }
+  foot = standOn(at, z)
+  perspective.position.copy(toWorld(resolve(at), foot + EYE))
   eyeHeight = foot + EYE
-  applyView('walk', 'camera: walk')
-  look.lock()
+  if (lookAt) lookFrom(perspective.position, lookAt)
+  else applyLook()
+  currentPlace = label === 'walk' ? currentPlace : label
+  applyView('walk', label === 'walk' ? 'walking' : `place: ${placeName(label)}`)
+}
+
+// Stand at a place the scene names, looking where its camera looks.
+function walkTo(id: string) {
+  const camera = scene?.cameras.find((c) => c.id === id)
+  if (!camera?.at || !camera.look) return
+  beginWalk([camera.at[0], camera.at[1]], camera.at[2] - EYE, toWorld([camera.look[0], camera.look[1]], camera.look[2]), id)
+}
+
+// Walk: from where you left off, else from the first place, else from
+// the middle of the first room.
+function startWalk() {
+  if (!scene) return
+  if (view === 'walk') {
+    canvas.requestPointerLock?.()
+    return
+  }
+  if (lastWalk) {
+    yaw = lastWalk.yaw
+    pitch = lastWalk.pitch
+    beginWalk([lastWalk.position.x, -lastWalk.position.z], lastWalk.foot)
+    return
+  }
+  const camera = scene.cameras.find((c) => c.type === 'perspective' && c.at && c.look)
+  if (camera) walkTo(camera.id)
+  else beginWalk(centroid(scene.rooms[0].floor), roomElevation(scene, scene.rooms[0]))
+}
+
+function rememberWalk() {
+  if (view === 'walk') lastWalk = { position: perspective.position.clone(), yaw, pitch, foot }
 }
 
 const keys = new Set<string>()
@@ -381,15 +432,20 @@ const keys = new Set<string>()
 const velocity = new THREE.Vector2()
 function walkStep(delta: number) {
   const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN_SPEED : WALK_SPEED
-  const direction = perspective.getWorldDirection(new THREE.Vector3())
-  const forward = new THREE.Vector2(direction.x, -direction.z).normalize()
+  // Arrow keys turn and look; Q and E turn too, for a hand on WASD.
+  const turnRate = 1.8 * delta
+  if (keys.has('ArrowLeft') || keys.has('KeyQ')) turn(-turnRate / 0.0025, 0)
+  if (keys.has('ArrowRight') || keys.has('KeyE')) turn(turnRate / 0.0025, 0)
+  if (keys.has('PageUp')) turn(0, -turnRate / 0.0025 / 2)
+  if (keys.has('PageDown')) turn(0, turnRate / 0.0025 / 2)
+  const forward = new THREE.Vector2(-Math.sin(yaw), Math.cos(yaw))
   const right = new THREE.Vector2(forward.y, -forward.x)
   let f = 0
   let r = 0
   if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1
   if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1
-  if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1
+  if (keys.has('KeyD')) r += 1
+  if (keys.has('KeyA')) r -= 1
   const wanted = forward.multiplyScalar(f).add(right.multiplyScalar(r))
   if (wanted.lengthSq() > 0) wanted.setLength(speed)
   velocity.lerp(wanted, 1 - Math.exp(-delta * 10))
@@ -418,57 +474,112 @@ function walkStep(delta: number) {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return
   keys.add(event.code)
-  if (event.ctrlKey || event.metaKey || event.altKey || look.isLocked) return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (event.code.startsWith('Arrow') || event.code === 'PageUp' || event.code === 'PageDown') event.preventDefault()
   const key = event.key.toLowerCase()
-  if (key === 'c') cycleCamera()
+  if (key === 'c' || key === 'n') cyclePlace(1)
+  else if (key === 'b') cyclePlace(-1)
   else if (key === 'o') useCamera('orbit')
   else if (key === 'p') useCamera('plan')
   else if (key === 'v') startWalk()
   else if (key === '[' || key === ']') setCap(Math.min(cap, levels.length - 1) + (key === ']' ? 1 : -1))
-  else if (key === 'q') setQuality(quality === 'high' ? 'fast' : 'high', quality === 'high' ? 'Fast rendering: press Q for high quality.' : 'High quality.')
+  else if (key === 'h') setQuality(quality === 'high' ? 'fast' : 'high', quality === 'high' ? 'Fast rendering: press H for high quality.' : 'High quality.')
   else if (key === 'l') {
     labelsOn = !labelsOn
     applyView(view, $('camera').textContent ?? '')
   } else if (event.key === '?') $('help').classList.toggle('hidden')
 })
 window.addEventListener('keyup', (event) => keys.delete(event.code))
-look.addEventListener('lock', () => document.body.classList.add('walking'))
-look.addEventListener('unlock', () => {
-  document.body.classList.remove('walking')
-  keys.clear()
-  // Stay where you stopped walking, looking where you looked.
-  if (view === 'walk') {
-    orbit.target.copy(perspective.position).add(perspective.getWorldDirection(new THREE.Vector3()).multiplyScalar(1.5))
-    orbit.enabled = true
-    applyView('camera', 'camera: where you stopped')
+window.addEventListener('blur', () => keys.clear())
+
+// Looking around: the locked pointer, or a drag on the canvas. A double
+// click asks for the pointer lock; Esc gives it back.
+let dragging: { x: number; y: number; moved: number } | undefined
+canvas.addEventListener('mousedown', (event) => {
+  if (view !== 'walk' || locked() || event.button !== 0) return
+  dragging = { x: event.clientX, y: event.clientY, moved: 0 }
+})
+window.addEventListener('mousemove', (event) => {
+  if (view !== 'walk') return
+  if (locked()) {
+    turn(event.movementX, event.movementY)
+  } else if (dragging) {
+    turn(event.clientX - dragging.x, event.clientY - dragging.y)
+    dragging.moved += Math.abs(event.clientX - dragging.x) + Math.abs(event.clientY - dragging.y)
+    dragging.x = event.clientX
+    dragging.y = event.clientY
   }
 })
+window.addEventListener('mouseup', () => {
+  setTimeout(() => (dragging = undefined), 0)
+})
+canvas.addEventListener('dblclick', () => {
+  if (view === 'walk') canvas.requestPointerLock?.()
+})
+document.addEventListener('pointerlockchange', () => document.body.classList.toggle('locked', locked()))
+let touch: { x: number; y: number } | undefined
+canvas.addEventListener('touchstart', (event) => {
+  if (view !== 'walk' || event.touches.length !== 1) return
+  touch = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+}, { passive: true })
+canvas.addEventListener('touchmove', (event) => {
+  if (view !== 'walk' || !touch || event.touches.length !== 1) return
+  turn(event.touches[0].clientX - touch.x, event.touches[0].clientY - touch.y)
+  touch = { x: event.touches[0].clientX, y: event.touches[0].clientY }
+}, { passive: true })
 
-function cameraIds(): string[] {
-  return ['orbit', 'plan', ...(scene?.cameras.filter((c) => c.type === 'perspective').map((c) => c.id) ?? [])]
+// The places a scene names, in file order, with the level each stands on.
+function places(): { id: string; name: string; level: number }[] {
+  return (scene?.cameras ?? [])
+    .filter((c) => c.type === 'perspective' && c.at && c.look)
+    .map((c) => ({ id: c.id, name: placeName(c.id), level: Math.max(0, levels.findIndex((l, i) => c.at![2] >= l.elevation - 0.3 && (!levels[i + 1] || c.at![2] < levels[i + 1].elevation - 0.3))) }))
 }
 
-function cycleCamera() {
-  const ids = cameraIds()
-  const current = ($('camera').textContent ?? '').replace(/^.*: /, '')
-  useCamera(ids[(ids.indexOf(current) + 1) % ids.length])
+function placeName(id: string): string {
+  return id.replace(/-view$/, '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
 }
 
-function buildToolbar() {
-  const toolbar = $('toolbar')
-  const ids = cameraIds()
-  const label = (id: string) => (id === 'orbit' ? 'Overview' : id === 'plan' ? 'Plan' : id.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()))
-  toolbar.innerHTML = ''
-  for (const id of ids) {
-    const button = document.createElement('button')
-    button.textContent = label(id)
-    button.dataset.camera = id
-    button.addEventListener('click', () => useCamera(id))
-    toolbar.append(button)
+// Next or previous place, around and around.
+function cyclePlace(step: number) {
+  const list = places()
+  if (list.length === 0) return
+  const index = list.findIndex((p) => p.id === currentPlace)
+  walkTo(list[(index + step + list.length) % list.length].id)
+}
+
+// The sidebar: walk, the two overviews, the levels, and every place the
+// scene names, grouped by level, with previous and next.
+function buildSidebar() {
+  const menu = $('menu')
+  menu.innerHTML = ''
+  const button = (text: string, camera: string, onClick: () => void, className = '') => {
+    const b = document.createElement('button')
+    b.textContent = text
+    b.dataset.camera = camera
+    b.className = className
+    b.addEventListener('click', onClick)
+    return b
   }
+  const section = (title: string) => {
+    const h = document.createElement('div')
+    h.className = 'section'
+    h.textContent = title
+    menu.append(h)
+  }
+
+  section('Look around')
+  menu.append(button('Walk inside', 'walk', () => startWalk(), 'walk'))
+  const steps = document.createElement('div')
+  steps.className = 'row'
+  steps.append(button('‹ Previous', 'prev', () => cyclePlace(-1)), button('Next ›', 'next', () => cyclePlace(1)))
+  menu.append(steps)
+
+  section('From above')
+  menu.append(button('Overview', 'orbit', () => useCamera('orbit')))
+  menu.append(button('Plan', 'plan', () => useCamera('plan')))
   if (levels.length > 1) {
-    // Which levels to show: this one and the ones below it.
     const select = document.createElement('select')
     select.id = 'levels'
     select.title = 'Show this level and the ones below it ([ and ] keys)'
@@ -480,15 +591,26 @@ function buildToolbar() {
     })
     select.value = String(Math.min(cap, levels.length - 1))
     select.addEventListener('change', () => setCap(Number(select.value)))
-    toolbar.append(select)
+    menu.append(select)
   }
-  const walk = document.createElement('button')
-  walk.textContent = 'Walk inside'
-  walk.className = 'walk'
-  walk.dataset.camera = 'walk'
-  walk.addEventListener('click', () => startWalk())
-  toolbar.append(walk)
+
+  const list = places()
+  if (list.length > 0) {
+    section('Places')
+    let lastLevel = -1
+    for (const place of list) {
+      if (levels.length > 1 && place.level !== lastLevel) {
+        const h = document.createElement('div')
+        h.className = 'level'
+        h.textContent = levels[place.level]?.name ?? levels[place.level]?.id ?? ''
+        menu.append(h)
+        lastLevel = place.level
+      }
+      menu.append(button(place.name, place.id, () => walkTo(place.id)))
+    }
+  }
 }
+$('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('collapsed'))
 
 // ---- Selecting and showing -------------------------------------------------
 
@@ -496,7 +618,7 @@ function buildToolbar() {
 // the agent knows exactly which entity that is.
 const raycaster = new THREE.Raycaster()
 canvas.addEventListener('click', (event) => {
-  if (!built || look.isLocked) return
+  if (!built || locked() || (dragging && dragging.moved > 6)) return
   const rect = canvas.getBoundingClientRect()
   const pointer = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
   raycaster.setFromCamera(pointer, active)
@@ -548,7 +670,8 @@ function focus(id: string) {
   if (!built || !scene) return
   const object = built.entities.get(id)
   if (!object) return
-  if (look.isLocked) look.unlock()
+  if (locked()) document.exitPointerLock()
+  rememberWalk()
   const box = new THREE.Box3().setFromObject(object)
   const center = box.getCenter(new THREE.Vector3())
   const size = Math.max(2.5, box.getSize(new THREE.Vector3()).length() * 1.6)
@@ -634,13 +757,13 @@ async function load(first: boolean): Promise<void> {
   }
   $('title').textContent = next.name
   document.title = `${next.name} · Stage`
-  buildToolbar()
+  buildSidebar()
 
   if (first) {
     resize()
     const wanted = levelIndexOf(params.get('level'))
     if (wanted !== undefined) cap = wanted >= levels.length - 1 ? Infinity : wanted
-    if (!restoreView()) useCamera(params.get('camera') ?? 'orbit')
+    if (!restoreView()) useCamera(params.get('camera') ?? (headless ? 'orbit' : (places()[0]?.id ?? 'orbit')))
   } else {
     fitPlan()
     applyView(view, $('camera').textContent ?? '')
@@ -661,17 +784,23 @@ const stateKey = `stage:view:${scenePath}`
 function saveView() {
   if (headless || !scene) return
   try {
-    sessionStorage.setItem(stateKey, JSON.stringify({ view, label: $('camera').textContent, position: perspective.position.toArray(), target: orbit.target.toArray(), fov: perspective.fov, cap: cap === Infinity ? null : cap, planLevel }))
+    sessionStorage.setItem(stateKey, JSON.stringify({ view, label: $('camera').textContent, position: perspective.position.toArray(), target: orbit.target.toArray(), fov: perspective.fov, cap: cap === Infinity ? null : cap, planLevel, yaw, pitch, foot, place: currentPlace }))
   } catch {}
 }
 function restoreView(): boolean {
   if (headless || params.has('camera')) return false
   try {
-    const saved = JSON.parse(sessionStorage.getItem(stateKey) ?? 'null') as { view: View; label: string; position: number[]; target: number[]; fov: number; cap: number | null; planLevel?: number } | null
+    const saved = JSON.parse(sessionStorage.getItem(stateKey) ?? 'null') as { view: View; label: string; position: number[]; target: number[]; fov: number; cap: number | null; planLevel?: number; yaw?: number; pitch?: number; foot?: number; place?: string } | null
     if (!saved) return false
     cap = saved.cap === null || saved.cap === undefined ? Infinity : saved.cap
     if (saved.view === 'plan') {
       useCamera(`plan:${levels[saved.planLevel ?? levels.length - 1]?.id ?? ''}`)
+      return true
+    }
+    if (saved.view === 'walk') {
+      yaw = saved.yaw ?? 0
+      pitch = saved.pitch ?? 0
+      beginWalk([saved.position[0], -saved.position[2]], saved.foot ?? saved.position[1] - EYE, undefined, saved.place ?? 'walk')
       return true
     }
     active = perspective
@@ -681,7 +810,7 @@ function restoreView(): boolean {
     perspective.position.fromArray(saved.position)
     orbit.target.fromArray(saved.target)
     orbit.update()
-    applyView(saved.view === 'walk' ? 'camera' : saved.view, saved.label)
+    applyView(saved.view, saved.label)
     return true
   } catch {
     return false
@@ -727,7 +856,7 @@ const lastView = new THREE.Matrix4()
 let stillSince = 0
 function frame() {
   const delta = Math.min(clock.getDelta(), 0.1)
-  if (look.isLocked) walkStep(delta)
+  if (view === 'walk') walkStep(delta)
   else if (orbit.enabled) orbit.update()
   const now = performance.now()
   for (let i = highlights.length - 1; i >= 0; i--) {

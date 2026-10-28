@@ -60,39 +60,72 @@ kbd {
 
 body.headless .hud { display: none; }
 
-.toolbar {
+.sidebar {
   position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 60px;
+  left: 16px;
+  bottom: 16px;
+  width: 210px;
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  flex-direction: column;
+  pointer-events: auto;
+}
+.menu-toggle {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--panel);
+  border: 0;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.menu {
+  margin-top: 6px;
+  padding: 6px;
   border-radius: 10px;
   background: var(--panel);
   backdrop-filter: blur(8px);
-  pointer-events: auto;
-  max-width: calc(100vw - 420px);
-  overflow-x: auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.toolbar button {
+.sidebar.collapsed .menu { display: none; }
+.menu .section {
+  margin: 8px 6px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.menu .section:first-child { margin-top: 2px; }
+.menu .level { margin: 6px 6px 0; font-size: 12px; color: var(--muted); }
+.menu button, .menu select {
   font: inherit;
   font-size: 13px;
   color: var(--text);
   background: transparent;
   border: 0;
   border-radius: 7px;
-  padding: 6px 12px;
+  padding: 6px 10px;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
 }
-.toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
-.toolbar button.active { background: rgba(255, 255, 255, 0.18); }
-.toolbar button.walk { background: var(--accent); color: #1a1a1a; font-weight: 600; }
-.toolbar button.walk:hover { filter: brightness(1.08); }
+.menu select { background: rgba(255, 255, 255, 0.08); margin: 2px 0; }
+.menu select option { color: #1a1a1a; }
+.menu button:hover { background: rgba(255, 255, 255, 0.1); }
+.menu button.active { background: rgba(255, 255, 255, 0.18); }
+.menu button.walk { background: var(--accent); color: #1a1a1a; font-weight: 600; }
+.menu button.walk:hover { filter: brightness(1.08); }
+.menu .row { display: flex; gap: 2px; }
+.menu .row button { flex: 1; text-align: center; }
 
 .crosshair, .walk-hint { display: none; }
-body.walking .crosshair {
+body.locked .crosshair {
   display: block;
   position: absolute;
   left: 50%;
@@ -112,4 +145,5 @@ body.walking .walk-hint {
   transform: translateX(-50%);
   font-size: 13px;
 }
-body.walking .toolbar, body.walking .bottom, body.walking .hint { display: none; }
+body.locked .bottom, body.locked .hint { display: none; }
+.hud .top { left: 16px; }

@@ -14,7 +14,10 @@
         <div id="title" class="title">Stage</div>
         <div id="camera" class="chip"></div>
       </div>
-      <div id="toolbar" class="toolbar"></div>
+      <aside id="sidebar" class="sidebar">
+        <button id="menu-toggle" class="menu-toggle" title="Show or hide the menu">☰</button>
+        <div id="menu" class="menu"></div>
+      </aside>
       <div class="bottom">
         <div id="selection" class="panel hidden"></div>
         <div id="status" class="panel"></div>
@@ -22,17 +25,18 @@
       </div>
       <div id="help" class="panel help hidden">
         <div class="help-title">Keys</div>
-        <div><kbd>V</kbd> walk inside: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, mouse to look, <kbd>Shift</kbd> to hurry, <kbd>Esc</kbd> to stop</div>
-        <div><kbd>O</kbd> overview, <kbd>P</kbd> plan, <kbd>C</kbd> next camera</div>
-        <div><kbd>[</kbd> <kbd>]</kbd> one level down or up: the plan and the overview show that level and the ones below</div>
-        <div><kbd>L</kbd> room labels, <kbd>Q</kbd> high or fast rendering</div>
-        <div>Drag to orbit, scroll to zoom, right-drag to pan</div>
+        <div>Walking: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move, drag or <kbd>←</kbd><kbd>→</kbd> to turn, <kbd>Shift</kbd> to hurry</div>
+        <div>Double-click to lock the mouse for looking, <kbd>Esc</kbd> to free it</div>
+        <div><kbd>N</kbd> next place, <kbd>B</kbd> previous, <kbd>V</kbd> back to walking</div>
+        <div><kbd>O</kbd> overview, <kbd>P</kbd> plan, <kbd>[</kbd> <kbd>]</kbd> one level down or up</div>
+        <div><kbd>L</kbd> room labels, <kbd>H</kbd> high or fast rendering</div>
+        <div>Overview: drag to orbit, scroll to zoom, right-drag to pan</div>
         <div>Click anything to see its id and size</div>
         <div><kbd>?</kbd> this list</div>
       </div>
       <div class="hint"><kbd>?</kbd> keys</div>
       <div class="crosshair"></div>
-      <div class="walk-hint panel"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · mouse to look · <kbd>Shift</kbd> hurry · <kbd>Esc</kbd> stop</div>
+      <div class="walk-hint panel"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · drag or <kbd>←</kbd><kbd>→</kbd> to turn · double-click to lock the mouse · <kbd>N</kbd> next place</div>
     </div>
     <script type="module" src="./main.ts"></script>
   </body>
