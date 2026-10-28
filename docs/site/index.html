@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage demo</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1d1d1b; --bg: #f6f4ee; --muted: #6b6a66; --line: #d9d6cc; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #ece9e0; --bg: #17171a; --muted: #a3a09a; --line: #34343a; } }
+  body { margin: 0; padding: 48px 16px; font: 17px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 32px; margin: 0 0 8px; }
+  p { margin: 0 0 20px; color: var(--muted); }
+  a.card { display: block; padding: 20px; margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; color: var(--fg); text-decoration: none; }
+  a.card b { display: block; font-size: 20px; }
+  a.card span { color: var(--muted); }
+  kbd { font: inherit; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stage</h1>
+  <p>Scenes an AI agent wrote, that you can walk through. Pick one, press <kbd>Walk inside</kbd>, then <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the mouse; <kbd>P</kbd> is the plan, <kbd>O</kbd> the overview.</p>
+  <a class="card" href="./two-storey/"><b>Two-storey house</b><span>Hall, kitchen and living below, bedrooms above, a stair through a well, and a roof terrace.</span></a>
+  <a class="card" href="./flat/"><b>A flat with a bedroom</b><span>Two rooms and a bedroom, furnished, with a person standing in each.</span></a>
+  <p>Source and install: <a href="https://github.com/dvrshil/stage">github.com/dvrshil/stage</a></p>
+</main>
+</body>
+</html>

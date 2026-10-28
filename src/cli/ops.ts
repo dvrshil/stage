@@ -17,7 +17,7 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 export const EXAMPLES = join(ROOT, 'examples')
 const CLI = join(ROOT, 'src/cli/index.ts')
 
-const SCHEMAS: Record<Collection, z.ZodType> = {
+export const SCHEMAS: Record<Collection, z.ZodType> = {
   levels: Level,
   rooms: Room,
   openings: Opening,
@@ -33,7 +33,7 @@ export async function newScene(path: string, name: string, from = 'empty'): Prom
   mkdirSync(dirname(target), { recursive: true })
   if (from !== 'empty') {
     const example = join(EXAMPLES, from, 'scene.json')
-    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, or empty`)
+    if (!existsSync(example)) throw new Error(`no example is called "${from}"; examples: flat, flat-with-bedroom, two-storey, or empty`)
     await copyFile(example, target)
     return target
   }

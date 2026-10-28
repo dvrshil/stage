@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "stage": {
+      "command": "node",
+      "args": ["bin/stage.js", "mcp"]
+    }
+  }
+}

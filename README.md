@@ -26,29 +26,52 @@ two hundred CC0 pieces with real sizes.
 | --- | --- |
 | ![Contact sheet](docs/contact-sheet.jpg) | ![Plan with room sizes](docs/plan-labels.jpg) |
 
+## Try it in a browser
+
+The two-storey example is live at <https://dvrshil.github.io/stage/two-storey/>:
+press **Walk inside**, then `W` `A` `S` `D` and the mouse. No install.
+
 ## Install
 
-Stage needs Node 22 or later and Chromium or Chrome for renders.
+Stage needs Node 22.18 or later (24 or later is best), and Chromium or
+Chrome for headless renders; the viewer runs in any browser.
 
 ```sh
-npm install
-npm run build          # the viewer
-bin/stage assets fetch # 40 MB of CC0 textures, models, and sky, into ~/.cache/stage
+git clone https://github.com/dvrshil/stage
+cd stage && npm install           # also builds the viewer
+node bin/stage.js assets fetch    # 40 MB of CC0 textures, models, and sky, into ~/.cache/stage
 ```
 
 Without `assets fetch`, everything still works: textures fall back to
 patterns drawn in code and furniture to pieces built from primitives.
+`npm install -g .` puts a `stage` command on your path; the examples
+below spell it out as `node bin/stage.js`.
 
 ## Use it with an agent
 
+Stage is an MCP server. One line adds it to Claude Code:
+
 ```sh
-claude mcp add --scope user stage -- /path/to/stage/bin/stage mcp
-bin/stage skill install   # teaches Claude Code and Codex the scene format
+claude mcp add --scope user stage -- node /path/to/stage/bin/stage.js mcp
 ```
 
-Then ask: "Start a scene from the flat-with-bedroom example, open it, and
-move the sofa under the window." The agent sees every render it asks for;
-you see every change in your browser as it lands.
+Codex is `codex mcp add stage -- node /path/to/stage/bin/stage.js mcp`;
+Cursor, Claude Desktop, Gemini CLI, VS Code, and any other MCP client take
+the same command in their JSON config, and [docs/mcp.md](docs/mcp.md) has
+each one. Opening this repository itself in Claude Code offers the server
+from its `.mcp.json`.
+
+The server carries its own guide, so an agent that has never seen Stage
+knows the format and the order of work before its first call: rooms, then
+openings, then furniture, looking at a render after each step. The tools
+say what they are for, `query` and `check` answer in words that name the
+entity and the fix, and `render` hands the image back into the
+conversation. `node bin/stage.js skill install` also installs the guide as a
+skill for Claude Code and Codex, for agents that read skills before tools.
+
+Then ask: "Start a scene from the two-storey example, open it, and move the
+sofa under the window." The agent sees every render it asks for; you see
+every change in your browser as it lands.
 
 ## The scene file
 
@@ -77,7 +100,7 @@ with a parapet where nothing else stands. A level can carry a `plan`
 image, the architect's drawing, shown under the plan view so the walls can
 be checked against it; render `plan:<level>` to see one floor at a time.
 
-`bin/stage schema` prints the whole format as JSON Schema, and
+`node bin/stage.js schema` prints the whole format as JSON Schema, and
 `examples/` has three complete scenes, including a two-storey house.
 
 ## Commands
@@ -120,6 +143,13 @@ model Poly Haven publishes, measured and listed by
 `scripts/grow-library.ts`. A few models are exported at the wrong scale,
 so the viewer fits each one to its recorded size. A scene can also carry
 its own `materials`: a color, or any Poly Haven texture set by id.
+
+## Contributing
+
+Issues and pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md)
+says where things live and how to run the tests. Scenes you build are
+yours; a scene that shows off something Stage does well makes a good
+example.
 
 ## Development
 

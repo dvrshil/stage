@@ -15,6 +15,22 @@ A Stage scene is one JSON file. You write it with `set`, `remove`, or
 never need to reread the file. A person may have the scene open in their
 browser: it updates the moment you write, and outlines what you changed.
 
+## Start
+
+- A new scene: `new_scene` (from an example when the person wants something
+  to react to), then `open_viewer` right away so they watch it take shape.
+  With no path given, use `~/stage-scenes/<name>/scene.json`.
+- An existing scene: `check` it, then `query "rooms"` for the lay of the
+  land. `read_scene` only when you must; `query` is cheaper.
+- Before the first `render` of a scene with library pieces, `fetch_assets`
+  with the scene once, so the picture shows the real models and surfaces.
+- The tools: `new_scene`, `open_viewer`, `show` (fly the person's view),
+  `check`, `render` (an image you look at), `query`, `set`, `remove`,
+  `write_scene`, `read_scene`, `assets`, `fetch_assets`, `materials`,
+  `schema`, `export` (glTF). Resources `stage://guide`, `stage://schema`,
+  and `stage://examples/<name>` hold this guide, the format, and the
+  example scenes.
+
 ## The format
 
 - Meters and degrees. Plan coordinates `[x, y]`: x east, y north.

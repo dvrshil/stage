@@ -1,17 +1,49 @@
 {
-  "name": "stage",
+  "name": "stage-engine",
   "version": "0.1.0",
   "description": "An AI-native 3D scene engine: agents write one scene file, people walk through it in a browser.",
-  "type": "module",
-  "license": "MIT",
-  "bin": {
-    "stage": "bin/stage"
+  "keywords": [
+    "3d",
+    "mcp",
+    "agent",
+    "floor-plan",
+    "interior",
+    "three.js",
+    "scene",
+    "architecture",
+    "claude",
+    "codex"
+  ],
+  "homepage": "https://github.com/dvrshil/stage#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dvrshil/stage.git"
   },
+  "bugs": {
+    "url": "https://github.com/dvrshil/stage/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "stage": "bin/stage.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "assets",
+    "examples",
+    "docs/mcp.md"
+  ],
   "scripts": {
     "build": "vite build",
     "test": "node --no-warnings --test tests/core.test.ts",
     "typecheck": "tsc --noEmit",
-    "test:render": "node --no-warnings --test tests/render.test.ts"
+    "test:render": "node --no-warnings --test tests/render.test.ts",
+    "prepare": "vite build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",
