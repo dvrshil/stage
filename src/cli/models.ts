@@ -133,7 +133,8 @@ const polyhaven: ModelSource = {
     polyhavenIndex ??= getJson(`${POLYHAVEN}/assets?type=models`)
     const [index, ranked] = await Promise.all([polyhavenIndex, getJson(`${POLYHAVEN}/search?q=${encodeURIComponent(words)}&t=models`).catch(() => [])])
     const list = Array.isArray(ranked) ? ranked : (ranked?.results ?? [])
-    const order: string[] = list.map((r: any) => r.slug ?? r.id).filter((id: string) => index[id])
+    // The hybrid search ranks everything; only real matches are worth a look.
+    const order: string[] = list.filter((r: any) => (r.score ?? 1) >= 0.5).map((r: any) => r.slug ?? r.id).filter((id: string) => index[id])
     if (order.length === 0) {
       const terms = words.toLowerCase().split(/\s+/).filter(Boolean)
       for (const [id, a] of Object.entries<any>(index)) {
