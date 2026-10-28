@@ -151,6 +151,8 @@ Every command except `open`, `serve`, and `mcp` needs no display, takes
 | `stage new <path> [--from flat]` | Start a scene, empty or from an example |
 | `stage check <scene>` | Schema, references, and spatial rules |
 | `stage render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]` | A deterministic image, through the same page the viewer uses; `plan:<level>` for one floor, `room:<id>` for a camera standing in any room |
+| `stage render <scene> --camera object:duck:front -o duck.png` | Framed on any object, item, or room: `:front`, `:back`, `:left`, `:right`, `:top`, the corners, a bearing, and `:close` |
+| `stage render <scene> --around duck -o turntable.png` | A turntable of one thing: every side, the top, and a close view on one sheet |
 | `stage render <scene> --all-cameras -o sheet.png` | Every camera, and one per room, as a contact sheet |
 | `stage query <scene> rooms` | Also `room <id>`, `objects`, `object <id>` (its world placement after its parents), `items in <room>`, `walls <room>`, `openings`, `cameras`, `bounds`, `adjacent <room>`, `areas [level]`, `free <room>`, `fits <asset> in <room>` |
 | `stage set <scene> items '<json>'` | Add an entity, or replace the one with its id |

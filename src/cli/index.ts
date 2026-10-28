@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { searchAssets } from '../core/assets.ts'
 import { formatProblem, type CheckResult } from '../core/check.ts'
-import { allCameras } from '../core/cameras.ts'
+import { allCameras, turntable } from '../core/cameras.ts'
 import { materialNames } from '../core/materials.ts'
 import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, jsonSchema, type Collection } from '../core/schema.ts'
@@ -28,7 +28,8 @@ Commands that need no display:
   check <scene>                        Report every problem, with its entity and a fix
   render <scene> -o out.png [--camera id] [--level id] [--size 1280x720]
                                        [--all-cameras: every camera, and one per room, as a contact sheet]
-                                       Cameras: orbit, plan, plan:<level>, or a camera id
+                                       [--around id: a turntable of one object, item, or room]
+                                       Cameras: orbit, plan, plan:<level>, room:<id>, object:<id>[:front|back|left|right|top|front-left...][:close], or a camera id
   query <scene> <question...>          ${QUESTIONS.join(' | ')}
   set <scene> <collection> '<json>'    Add an entity, or replace the one with its id
   remove <scene> <id>                  Remove an entity
@@ -87,6 +88,7 @@ async function main(argv: string[]): Promise<number> {
       resolution: { type: 'string' },
       all: { type: 'boolean' },
       'all-cameras': { type: 'boolean' },
+      around: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   })
@@ -133,7 +135,7 @@ async function main(argv: string[]): Promise<number> {
       }
       const renderer = await Renderer.start()
       try {
-        const sheet = values['all-cameras'] === true ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
+        const sheet = values.around ? turntable(result.scene!, values.around as string) : values['all-cameras'] === true ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
         const png = await renderer.render(scene, { camera: values.camera as string | undefined, level: values.level as string | undefined, width: sheet && !values.size ? 640 : width, height: sheet && !values.size ? 360 : height, sheet })
         const target = resolve(out)
         mkdirSync(dirname(target), { recursive: true })

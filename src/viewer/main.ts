@@ -363,9 +363,21 @@ function useCamera(id: string) {
   rememberWalk()
   // "plan:first" or "orbit:first" looks at that level and the ones below.
   // "room:kitchen" is one camera; "plan:first" is the plan of a level.
-  const [name, levelId] = id.startsWith('room:') ? [id, undefined] : id.split(':')
+  const [name, levelId] = id.startsWith('room:') || id.startsWith('object:') ? [id, undefined] : id.split(':')
   const camera = findCamera(scene, name)
   const wanted = levelIndexOf(levelId ?? camera?.level)
+  if (id.startsWith('object:') && camera?.at && camera.look) {
+    // Framed on a thing, from the same place the agent's render is.
+    active = perspective
+    orbit.enabled = true
+    perspective.fov = camera.fov
+    perspective.updateProjectionMatrix()
+    perspective.position.copy(toWorld([camera.at[0], camera.at[1]], camera.at[2]))
+    orbit.target.copy(toWorld([camera.look[0], camera.look[1]], camera.look[2]))
+    orbit.update()
+    applyView('camera', `camera: ${id}`)
+    return
+  }
   if (name === 'plan' || camera?.type === 'plan') {
     active = plan
     orbit.enabled = false
@@ -751,15 +763,24 @@ function focus(id: string) {
   if (!object) return
   if (locked()) document.exitPointerLock()
   rememberWalk()
-  const box = new THREE.Box3().setFromObject(object)
-  const center = box.getCenter(new THREE.Vector3())
-  const size = Math.max(2.5, box.getSize(new THREE.Vector3()).length() * 1.6)
   active = perspective
   orbit.enabled = true
-  perspective.fov = 45
-  perspective.updateProjectionMatrix()
-  orbit.target.copy(center)
-  perspective.position.copy(center).add(new THREE.Vector3(-0.5, 0.75, 0.9).normalize().multiplyScalar(size))
+  const framed = findCamera(scene, `object:${id}`)
+  if (framed?.at && framed.look) {
+    // The same framing the agent's render uses.
+    perspective.fov = framed.fov
+    perspective.updateProjectionMatrix()
+    perspective.position.copy(toWorld([framed.at[0], framed.at[1]], framed.at[2]))
+    orbit.target.copy(toWorld([framed.look[0], framed.look[1]], framed.look[2]))
+  } else {
+    const box = new THREE.Box3().setFromObject(object)
+    const center = box.getCenter(new THREE.Vector3())
+    const size = Math.max(2.5, box.getSize(new THREE.Vector3()).length() * 1.6)
+    perspective.fov = 45
+    perspective.updateProjectionMatrix()
+    orbit.target.copy(center)
+    perspective.position.copy(center).add(new THREE.Vector3(-0.5, 0.75, 0.9).normalize().multiplyScalar(size))
+  }
   orbit.update()
   applyView('focus', `focus: ${id}`)
   select(id)

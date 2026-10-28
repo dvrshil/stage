@@ -447,3 +447,30 @@ test('a zip of glTF unpacks, and a glb measures', async () => {
   // Width, depth, height: the box is 1 wide (x), 0.5 deep (z), 1 tall (y).
   assert.deepEqual(await measureFile(new URL('./fixtures/box.glb', import.meta.url).pathname), [1, 0.5, 1])
 })
+
+// Framing cameras: object:<id> from any side, and the turntable.
+import { findCamera, frameCamera, turntable } from '../src/core/cameras.ts'
+
+test('object cameras frame a thing from the side asked for, closer when asked', () => {
+  const scene = check(
+    objectScene([
+      { id: 'cart', kind: 'group', at: [10, 10, 0], facing: 90 },
+      { id: 'crate', kind: 'box', parent: 'cart', size: [1, 1, 1] },
+    ]),
+  ).scene!
+  const front = frameCamera(scene, 'object:cart:front')!
+  // The cart faces east, so its front view stands east of it, looking at its middle.
+  assert.ok(front.at![0] > 11 && Math.abs(front.at![1] - 10) < 0.01, `front stands east: ${front.at}`)
+  assert.deepEqual(front.look, [10, 10, 0.5])
+  const close = frameCamera(scene, 'object:cart:front:close')!
+  assert.ok(Math.hypot(close.at![0] - 10, close.at![2] - 0.5) < Math.hypot(front.at![0] - 10, front.at![2] - 0.5), 'close is closer')
+  const top = frameCamera(scene, 'object:cart:top')!
+  assert.ok(top.at![2] > 2, `top is above: ${top.at}`)
+  const bearing = frameCamera(scene, 'object:crate:180')!
+  assert.ok(bearing.at![1] < 9, `bearing 180 stands south: ${bearing.at}`)
+  assert.equal(frameCamera(scene, 'object:nobody'), undefined)
+  assert.equal(frameCamera(scene, 'object:cart:sideways'), undefined)
+  assert.equal(findCamera(scene, 'object:cart:left')?.fov, 40)
+  assert.equal(turntable(scene, 'cart').length, 10)
+  assert.throws(() => turntable(scene, 'nobody'), /nothing is called/)
+})

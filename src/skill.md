@@ -89,7 +89,13 @@ stands in rooms, levels stack. A scene with no rooms is fine.
   size after its parents' turns; `query "object <id>"` adds its box and
   children. Build a thing, query it, render it, and compare the two.
 - Build order for a thing: a `group` at its place, the biggest part first,
-  then the rest in the group's frame. Render `orbit` and a camera close in.
+  then the rest in the group's frame. Then look at it: `render` with
+  camera `object:<id>` frames it (with `:front`, `:left`, `:top`, a
+  bearing like `:120`, and `:close` for a tight crop), and `around: <id>`
+  renders a turntable of every side, the top, and a close view as one
+  sheet. Nothing you build is done until you have looked at its turntable
+  and fixed what is wrong: a part floating, a face the wrong way, a beak
+  on the back of the head.
 - Something the library lacks (a bicycle, a dinosaur, a laptop, a tree):
   `find_model` searches the open model libraries (Poly Haven's CC0 scans,
   Sketchfab, the Icosa Gallery, Poly Pizza when its key is set) and shows
@@ -156,7 +162,8 @@ stands in rooms, levels stack. A scene with no rooms is fine.
    wall. `check` reports pieces that run into each other, wardrobes and
    cabinets without room to open, and things standing on windows.
 4. Render `orbit` and a camera at eye level, or `sheet: true` for every
-   camera and one standing in each room at once. Fix what looks wrong. Call
+   camera and one standing in each room at once; `object:<id>` and
+   `around` for one thing from every side. Fix what looks wrong. Call
    `fetch_assets` with the scene once, so renders show the real models and
    photographed surfaces instead of stand-ins.
 5. When a person is watching, use `show` to fly their view to what you are

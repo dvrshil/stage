@@ -6,7 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { ASSETS, searchAssets } from '../core/assets.ts'
 import { formatProblem, type CheckResult } from '../core/check.ts'
-import { allCameras } from '../core/cameras.ts'
+import { ANGLES, allCameras, findCamera, turntable } from '../core/cameras.ts'
 import { materialNames } from '../core/materials.ts'
 import { QUESTIONS, query } from '../core/query.ts'
 import { COLLECTIONS, jsonSchema, type Collection } from '../core/schema.ts'
@@ -134,7 +134,7 @@ export async function runMcp(): Promise<void> {
     'show',
     {
       title: 'Show the person',
-      description: "Point the person's open viewer at what you are talking about: a camera id ('orbit', 'plan', 'plan:<level>', 'room:<room id>', or one of the scene's), a level (that one and the ones below it), or an entity to fly to and outline. Use it when you describe a change or ask them to look.",
+      description: "Point the person's open viewer at what you are talking about: a camera id ('orbit', 'plan', 'plan:<level>', 'room:<room id>', 'object:<id>[:angle][:close]' framed exactly as render frames it, or one of the scene's), a level (that one and the ones below it), or an entity to fly to and outline. Use it when you describe a change or ask them to look.",
       inputSchema: { scene: scenePath, camera: z.string().optional(), level: z.string().optional().describe('A level id: show it and the levels below it'), focus: z.string().optional().describe('An entity id to fly to and outline') },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -160,7 +160,7 @@ export async function runMcp(): Promise<void> {
     'render',
     {
       title: 'Render an image',
-      description: "Render the scene headlessly and return the image, which you look at before going on; it is the only truth about how the scene looks. Cameras: 'orbit' (overview from the southwest, the default), 'plan' (top-down with room names and sizes, over the level's drawing when it has one), 'plan:<level>' (one level), 'room:<room id>' (standing in that room at eye height), or any camera id in the scene. Pass `level` to see a level with the ones above hidden. `sheet` tiles every camera and one per room into one image: the fastest way to look at a whole house. Call fetch_assets with the scene once first, so models and surfaces are the real ones.",
+      description: "Render the scene headlessly and return the image, which you look at before going on; it is the only truth about how the scene looks. Cameras: 'orbit' (overview from the southwest, the default), 'plan' (top-down with room names and sizes, over the level's drawing when it has one), 'plan:<level>' (one level), 'room:<room id>' (standing in that room at eye height), 'object:<id>' (framed on an object with everything hung on it, an item, or a room; add ':front', ':back', ':left', ':right', ':top', ':front-left' and the other corners, or a compass bearing like ':120'; add ':close' for a tight crop), or any camera id in the scene. `around` renders a turntable of one thing: every side, the top, and a close view, as one sheet; nothing you build is done until you have looked at its turntable and fixed what is wrong. `sheet` tiles every camera and one per room into one image: the fastest way to look at a whole house. Pass `level` to see a level with the ones above hidden. Call fetch_assets with the scene once first, so models and surfaces are the real ones.",
       inputSchema: {
         scene: scenePath,
         camera: z.string().optional(),
@@ -169,14 +169,16 @@ export async function runMcp(): Promise<void> {
         height: z.number().int().min(240).max(1080).default(640),
         quality: z.enum(['high', 'fast']).optional().describe('fast skips ambient occlusion and shadows for a quick look'),
         sheet: z.boolean().optional().describe('Every camera, plus one standing in each room, as one contact sheet of small tiles'),
+        around: z.string().optional().describe('An object, item, or room id: a turntable sheet of it from every side, the top, and up close'),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ scene, camera, level, width, height, quality, sheet }) =>
+    ({ scene, camera, level, width, height, quality, sheet, around }) =>
       guarded(async () => {
         const result = await checkScene(scene)
         if (!result.ok) return [text(`${problems(result)}\nfix the errors before rendering`)]
-        const cameras = sheet ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
+        if (camera?.startsWith('object:') && !findCamera(result.scene!, camera)) return [text(`${camera}: nothing is called "${camera.split(':')[1]}", or the angle is not one of ${ANGLES.join(', ')}, a bearing, or close.`)]
+        const cameras = around ? turntable(result.scene!, around) : sheet ? allCameras(result.scene!).filter((c) => c.type === 'perspective').map((c) => c.id).concat('orbit', 'plan') : undefined
         const png = await withRenderer((r) => r.render(resolve(scene), { camera, level, quality, width: cameras ? 480 : width, height: cameras ? 270 : height, sheet: cameras }))
         return [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }, text(problems(result))]
       }),
@@ -224,7 +226,8 @@ export async function runMcp(): Promise<void> {
     ({ scene, collection, entity }) =>
       guarded(async () => {
         const { replaced, result } = await upsert(scene, collection as Collection, entity)
-        return [text(`${replaced ? 'replaced' : 'added'} ${String(entity.id)}\n${problems(result)}`)]
+        const look = collection === 'objects' || collection === 'items' ? `\nlook at it: render camera "object:${String(entity.id)}", and around: "${String(entity.id)}" for every side before you call it done.` : ''
+        return [text(`${replaced ? 'replaced' : 'added'} ${String(entity.id)}${look}\n${problems(result)}`)]
       }),
   )
 
@@ -352,7 +355,7 @@ export async function runMcp(): Promise<void> {
         if (!place) return [text({ ...fetched, note: note || undefined, next: `set objects {"id": ..., "kind": "model", "file": "${fetched.file}", "size": ${JSON.stringify(fetched.size)}, "at": [x, y, z]}` })]
         const entity = { id: place.id, kind: 'model', file: fetched.file, size: place.size ?? fetched.size, at: place.at, facing: place.facing, parent: place.parent, room: place.room, label: place.label, source: fetched.source, license: fetched.license, credit: fetched.credit || undefined }
         const { replaced, result } = await upsert(scene, 'objects', JSON.parse(JSON.stringify(entity)))
-        return [text(`${replaced ? 'replaced' : 'added'} ${place.id}: ${fetched.file}, ${(place.size ?? fetched.size).join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''}.${place.size ? '' : note}\n${problems(result)}`)]
+        return [text(`${replaced ? 'replaced' : 'added'} ${place.id}: ${fetched.file}, ${(place.size ?? fetched.size).join(' × ')} m, ${fetched.license}${fetched.credit ? ` by ${fetched.credit}` : ''}.${place.size ? '' : note}\nlook at it: render camera "object:${place.id}" (the model's front may need "facing").\n${problems(result)}`)]
       }),
   )
 

@@ -98,7 +98,7 @@ an example entity for every collection, `query` lists its questions, and
 | `open_viewer` | Open it in the person's browser; the page follows the file |
 | `show` | Point their view at a camera, a level, or an entity |
 | `check` | Schema, references, and spatial rules, each with its fix |
-| `render` | An image of any camera, `room:<id>`, `plan:<level>`, or a contact sheet |
+| `render` | An image of any camera, `room:<id>`, `plan:<level>`, `object:<id>` framed from any side, a turntable `around` one thing, or a contact sheet |
 | `query` | Rooms, a room's edges and neighbors, objects and where they ended up, what fits where, free space, areas |
 | `set`, `remove`, `write_scene` | Change the file; every write is checked and reported |
 | `read_scene` | The whole file, when query is not enough |
